@@ -1,13 +1,15 @@
 use oas3::{
-    spec::{ObjectOrReference, ObjectSchema, Schema, SchemaType, SchemaTypeSet},
     OpenApiV3Spec,
+    spec::{ObjectOrReference, ObjectSchema, Schema, SchemaType, SchemaTypeSet},
 };
 use std::path::{Path, PathBuf};
 
 use super::camel_to_kebab;
 
 pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBuf, String)>) {
-    let Some(components) = &spec.components else { return };
+    let Some(components) = &spec.components else {
+        return;
+    };
     if components.schemas.is_empty() {
         return;
     }
@@ -70,7 +72,12 @@ pub fn render_schema_jsonc(schema: &Schema, spec: &OpenApiV3Spec) -> String {
 }
 
 fn render_top_level_object(obj: &ObjectSchema, spec: &OpenApiV3Spec) -> String {
-    if obj.schema_type.as_ref().map(|ts| ts.is_array_or_nullable_array()).unwrap_or(false) {
+    if obj
+        .schema_type
+        .as_ref()
+        .map(|ts| ts.is_array_or_nullable_array())
+        .unwrap_or(false)
+    {
         let item_lines = obj
             .items
             .as_ref()
@@ -112,18 +119,27 @@ pub(crate) fn property_lines(
     let resolved = match schema.resolve(spec) {
         Ok(s) => s,
         Err(_) => {
-            return vec![format!("{indent}\"{name}\": null{trail}  // unknown, {req}")];
+            return vec![format!(
+                "{indent}\"{name}\": null{trail}  // unknown, {req}"
+            )];
         }
     };
 
     match resolved {
         Schema::Boolean(b) => {
-            vec![format!("{indent}\"{name}\": {}{trail}  // boolean, {req}", b.0)]
+            vec![format!(
+                "{indent}\"{name}\": {}{trail}  // boolean, {req}",
+                b.0
+            )]
         }
         Schema::Object(oor) => match oor.as_ref() {
-            ObjectOrReference::Object(obj) => object_property_lines(name, obj, is_required, trail, depth, spec),
+            ObjectOrReference::Object(obj) => {
+                object_property_lines(name, obj, is_required, trail, depth, spec)
+            }
             ObjectOrReference::Ref { .. } => {
-                vec![format!("{indent}\"{name}\": null{trail}  // unresolved ref, {req}")]
+                vec![format!(
+                    "{indent}\"{name}\": null{trail}  // unresolved ref, {req}"
+                )]
             }
         },
     }
@@ -140,7 +156,11 @@ fn object_property_lines(
     let indent = "  ".repeat(depth);
     let req = if is_required { "required" } else { "optional" };
 
-    let is_array = obj.schema_type.as_ref().map(|ts| ts.is_array_or_nullable_array()).unwrap_or(false);
+    let is_array = obj
+        .schema_type
+        .as_ref()
+        .map(|ts| ts.is_array_or_nullable_array())
+        .unwrap_or(false);
 
     if is_array {
         let item_type = array_item_type_label(obj, spec);
@@ -166,7 +186,14 @@ fn object_property_lines(
         for (i, (pname, pschema)) in props.into_iter().enumerate() {
             let ptrail = if i + 1 == n { "" } else { "," };
             let preq = obj.required.contains(pname);
-            lines.extend(property_lines(pname, pschema, preq, ptrail, depth + 1, spec));
+            lines.extend(property_lines(
+                pname,
+                pschema,
+                preq,
+                ptrail,
+                depth + 1,
+                spec,
+            ));
         }
         lines.push(format!("{close}}}{trail}"));
         return lines;
@@ -175,7 +202,9 @@ fn object_property_lines(
     // Primitive
     let example = primitive_example(obj);
     let comment = type_comment(obj, req);
-    vec![format!("{indent}\"{name}\": {example}{trail}  // {comment}")]
+    vec![format!(
+        "{indent}\"{name}\": {example}{trail}  // {comment}"
+    )]
 }
 
 fn array_item_lines(items: &Schema, depth: usize, spec: &OpenApiV3Spec) -> Vec<String> {
@@ -196,7 +225,14 @@ fn array_item_lines(items: &Schema, depth: usize, spec: &OpenApiV3Spec) -> Vec<S
                 for (i, (pname, pschema)) in props.into_iter().enumerate() {
                     let ptrail = if i + 1 == n { "" } else { "," };
                     let preq = obj.required.contains(pname);
-                    lines.extend(property_lines(pname, pschema, preq, ptrail, depth + 1, spec));
+                    lines.extend(property_lines(
+                        pname,
+                        pschema,
+                        preq,
+                        ptrail,
+                        depth + 1,
+                        spec,
+                    ));
                 }
                 lines.push(format!("{close}}}"));
                 lines
@@ -210,17 +246,17 @@ fn array_item_lines(items: &Schema, depth: usize, spec: &OpenApiV3Spec) -> Vec<S
 }
 
 fn array_item_type_label(array_obj: &ObjectSchema, _spec: &OpenApiV3Spec) -> String {
-    let Some(items) = &array_obj.items else { return "any".to_string() };
+    let Some(items) = &array_obj.items else {
+        return "any".to_string();
+    };
 
     // Check for $ref before resolving to preserve the name
     match items.as_ref() {
         Schema::Object(oor) => match oor.as_ref() {
-            ObjectOrReference::Ref { ref_path, .. } => {
-                return ref_path
-                    .strip_prefix("#/components/schemas/")
-                    .unwrap_or(ref_path)
-                    .to_string();
-            }
+            ObjectOrReference::Ref { ref_path, .. } => ref_path
+                .strip_prefix("#/components/schemas/")
+                .unwrap_or(ref_path)
+                .to_string(),
             ObjectOrReference::Object(obj) => primitive_type_name(obj),
         },
         Schema::Boolean(_) => "boolean".to_string(),
@@ -238,18 +274,20 @@ fn primitive_type_name(obj: &ObjectSchema) -> String {
 }
 
 fn primitive_example(obj: &ObjectSchema) -> String {
-    if let Some(ex) = &obj.example {
-        if !ex.is_object() && !ex.is_array() {
-            return ex.to_string();
-        }
+    if let Some(ex) = &obj.example
+        && !ex.is_object()
+        && !ex.is_array()
+    {
+        return ex.to_string();
     }
     if let Some(val) = obj.enum_values.first() {
         return val.to_string();
     }
-    if let Some(def) = &obj.default {
-        if !def.is_object() && !def.is_array() {
-            return def.to_string();
-        }
+    if let Some(def) = &obj.default
+        && !def.is_object()
+        && !def.is_array()
+    {
+        return def.to_string();
     }
     match obj.schema_type.as_ref().map(primary_type) {
         Some(SchemaType::Integer) => "0".to_string(),
@@ -263,8 +301,11 @@ fn primitive_example(obj: &ObjectSchema) -> String {
 fn type_comment(obj: &ObjectSchema, req: &str) -> String {
     let base = match obj.schema_type.as_ref().map(primary_type) {
         Some(SchemaType::Integer) => {
-            if let Some(fmt) = &obj.format { format!("integer ({fmt})") }
-            else { "integer".to_string() }
+            if let Some(fmt) = &obj.format {
+                format!("integer ({fmt})")
+            } else {
+                "integer".to_string()
+            }
         }
         Some(SchemaType::Number) => "number".to_string(),
         Some(SchemaType::Boolean) => "boolean".to_string(),
@@ -278,13 +319,21 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
     let mut parts = vec![base, req.to_string()];
 
     if !obj.enum_values.is_empty() {
-        let vals = obj.enum_values.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ");
+        let vals = obj
+            .enum_values
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
         parts.push(format!("enum: {vals}"));
     }
 
     if let Some(fmt) = &obj.format {
         // format already included in integer case; add for others
-        if !matches!(obj.schema_type.as_ref().map(primary_type), Some(SchemaType::Integer)) {
+        if !matches!(
+            obj.schema_type.as_ref().map(primary_type),
+            Some(SchemaType::Integer)
+        ) {
             parts.insert(1, format!("format: {fmt}"));
         }
     }
@@ -295,8 +344,10 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
 fn primary_type(ts: &SchemaTypeSet) -> SchemaType {
     match ts {
         SchemaTypeSet::Single(t) => *t,
-        SchemaTypeSet::Multiple(types) => {
-            types.iter().copied().find(|t| *t != SchemaType::Null).unwrap_or(SchemaType::Object)
-        }
+        SchemaTypeSet::Multiple(types) => types
+            .iter()
+            .copied()
+            .find(|t| *t != SchemaType::Null)
+            .unwrap_or(SchemaType::Object),
     }
 }

@@ -7,7 +7,10 @@ use oas3::OpenApiV3Spec;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
-pub async fn openapi2skill(spec: &OpenApiV3Spec, output_dir: Option<&Path>) -> Result<(), anyhow::Error> {
+pub async fn openapi2skill(
+    spec: &OpenApiV3Spec,
+    output_dir: Option<&Path>,
+) -> Result<(), anyhow::Error> {
     let dir: PathBuf = output_dir
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(to_snake_case(&spec.info.title)));
@@ -41,7 +44,13 @@ pub async fn openapi2skill(spec: &OpenApiV3Spec, output_dir: Option<&Path>) -> R
 
 pub(crate) fn to_snake_case(s: &str) -> String {
     s.chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
         .collect::<String>()
         .split('_')
         .filter(|s| !s.is_empty())

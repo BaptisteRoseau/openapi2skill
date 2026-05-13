@@ -20,19 +20,27 @@ async fn test_generates_expected_files() {
     // Endpoint category
     assert!(p.join("pet/index.md").exists(), "missing pet/index.md");
     assert!(
-        p.join("pet/get-pet-find-by-status-multiple-examples.md").exists(),
+        p.join("pet/get-pet-find-by-status-multiple-examples.md")
+            .exists(),
         "missing get-pet-find-by-status-multiple-examples.md"
     );
     assert!(
-        p.join("pet/get-pet-find-by-status-single-example.md").exists(),
+        p.join("pet/get-pet-find-by-status-single-example.md")
+            .exists(),
         "missing get-pet-find-by-status-single-example.md"
     );
     assert!(p.join("pet/post-pet.md").exists(), "missing post-pet.md");
 
     // Schemas
-    assert!(p.join("schemas/index.md").exists(), "missing schemas/index.md");
+    assert!(
+        p.join("schemas/index.md").exists(),
+        "missing schemas/index.md"
+    );
     assert!(p.join("schemas/pet.md").exists(), "missing schemas/pet.md");
-    assert!(p.join("schemas/category.md").exists(), "missing schemas/category.md");
+    assert!(
+        p.join("schemas/category.md").exists(),
+        "missing schemas/category.md"
+    );
     assert!(p.join("schemas/tag.md").exists(), "missing schemas/tag.md");
 }
 

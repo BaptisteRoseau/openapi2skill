@@ -4,8 +4,8 @@ use std::{
 };
 
 use oas3::{
-    spec::{ObjectOrReference, Operation, ParameterIn, Response},
     OpenApiV3Spec,
+    spec::{ObjectOrReference, Operation, ParameterIn, Response},
 };
 
 use super::{path_to_slug, to_snake_case};
@@ -16,14 +16,21 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
     let mut by_category: HashMap<String, Vec<(String, String, String)>> = HashMap::new();
 
     for (path, method, op) in spec.operations() {
-        let cat = op.tags.first().cloned().unwrap_or_else(|| "general".to_string());
+        let cat = op
+            .tags
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "general".to_string());
         let cat_slug = to_snake_case(&cat);
         let method_str = method.as_str().to_lowercase();
         let slug = path_to_slug(&path);
         let filename = format!("{method_str}-{slug}.md");
         let summary = op.summary.as_deref().unwrap_or(path.as_str()).to_string();
         let content = render_endpoint(&path, method.as_str(), op, spec);
-        by_category.entry(cat_slug).or_default().push((filename, summary, content));
+        by_category
+            .entry(cat_slug)
+            .or_default()
+            .push((filename, summary, content));
     }
 
     for (cat_slug, entries) in &by_category {
@@ -51,7 +58,10 @@ fn render_endpoint(path: &str, method: &str, op: &Operation, spec: &OpenApiV3Spe
     out.push_str("| | |\n|--|--|\n");
     out.push_str(&format!("| **Method** | `{method}` |\n"));
     out.push_str(&format!("| **URL** | `{path}` |\n"));
-    out.push_str(&format!("| **Auth** | {} |\n", render_security(&op.security)));
+    out.push_str(&format!(
+        "| **Auth** | {} |\n",
+        render_security(&op.security)
+    ));
     if op.request_body.is_some() {
         out.push_str("| **Content-Type** | `application/json` |\n");
     }
@@ -64,8 +74,14 @@ fn render_endpoint(path: &str, method: &str, op: &Operation, spec: &OpenApiV3Spe
         .filter_map(|p| p.resolve(spec).ok())
         .collect();
 
-    let path_params: Vec<_> = params.iter().filter(|p| p.location == ParameterIn::Path).collect();
-    let query_params: Vec<_> = params.iter().filter(|p| p.location == ParameterIn::Query).collect();
+    let path_params: Vec<_> = params
+        .iter()
+        .filter(|p| p.location == ParameterIn::Path)
+        .collect();
+    let query_params: Vec<_> = params
+        .iter()
+        .filter(|p| p.location == ParameterIn::Query)
+        .collect();
 
     if !path_params.is_empty() || !query_params.is_empty() || op.request_body.is_some() {
         out.push_str("## Input\n\n");
@@ -77,7 +93,11 @@ fn render_endpoint(path: &str, method: &str, op: &Operation, spec: &OpenApiV3Spe
         out.push_str("|-----------|------|----------|-------------|\n");
         for p in &path_params {
             let type_ = render_param_type(&p.schema, spec);
-            let req = if p.required.unwrap_or(true) { "Yes" } else { "No" };
+            let req = if p.required.unwrap_or(true) {
+                "Yes"
+            } else {
+                "No"
+            };
             let desc = p.description.as_deref().unwrap_or("-");
             out.push_str(&format!("| `{}` | {type_} | {req} | {desc} |\n", p.name));
         }
@@ -90,25 +110,32 @@ fn render_endpoint(path: &str, method: &str, op: &Operation, spec: &OpenApiV3Spe
         out.push_str("|-----------|------|----------|-------------|\n");
         for p in &query_params {
             let type_ = render_param_type(&p.schema, spec);
-            let req = if p.required.unwrap_or(false) { "Yes" } else { "No" };
+            let req = if p.required.unwrap_or(false) {
+                "Yes"
+            } else {
+                "No"
+            };
             let desc = p.description.as_deref().unwrap_or("-");
             out.push_str(&format!("| `{}` | {type_} | {req} | {desc} |\n", p.name));
         }
         out.push('\n');
     }
 
-    if let Some(body_ref) = &op.request_body {
-        if let Ok(body) = body_ref.resolve(spec) {
-            out.push_str("### Payload\n\n");
-            let media = body.content.get("application/json").or_else(|| body.content.values().next());
-            if let Some(mt) = media {
-                if let Some(schema) = &mt.schema {
-                    out.push_str("```jsonc\n");
-                    out.push_str(&schema::render_schema_jsonc(schema, spec));
-                    out.push('\n');
-                    out.push_str("```\n\n");
-                }
-            }
+    if let Some(body_ref) = &op.request_body
+        && let Ok(body) = body_ref.resolve(spec)
+    {
+        out.push_str("### Payload\n\n");
+        let media = body
+            .content
+            .get("application/json")
+            .or_else(|| body.content.values().next());
+        if let Some(mt) = media
+            && let Some(schema) = &mt.schema
+        {
+            out.push_str("```jsonc\n");
+            out.push_str(&schema::render_schema_jsonc(schema, spec));
+            out.push('\n');
+            out.push_str("```\n\n");
         }
     }
 
@@ -135,14 +162,17 @@ fn render_endpoint(path: &str, method: &str, op: &Operation, spec: &OpenApiV3Spe
 }
 
 fn render_response_body(resp: &Response, spec: &OpenApiV3Spec, out: &mut String) {
-    let media = resp.content.get("application/json").or_else(|| resp.content.values().next());
-    if let Some(mt) = media {
-        if let Some(schema) = &mt.schema {
-            out.push_str("```jsonc\n");
-            out.push_str(&schema::render_schema_jsonc(schema, spec));
-            out.push('\n');
-            out.push_str("```\n\n");
-        }
+    let media = resp
+        .content
+        .get("application/json")
+        .or_else(|| resp.content.values().next());
+    if let Some(mt) = media
+        && let Some(schema) = &mt.schema
+    {
+        out.push_str("```jsonc\n");
+        out.push_str(&schema::render_schema_jsonc(schema, spec));
+        out.push('\n');
+        out.push_str("```\n\n");
     }
 }
 
@@ -161,7 +191,11 @@ fn render_security(security: &[oas3::spec::SecurityRequirement]) -> String {
             }
         })
         .collect();
-    if parts.is_empty() { "None".to_string() } else { parts.join("; ") }
+    if parts.is_empty() {
+        "None".to_string()
+    } else {
+        parts.join("; ")
+    }
 }
 
 fn render_param_type(schema: &Option<oas3::spec::Schema>, spec: &OpenApiV3Spec) -> String {
@@ -184,14 +218,19 @@ fn render_param_type(schema: &Option<oas3::spec::Schema>, spec: &OpenApiV3Spec) 
                     Some(ts) => {
                         let t = match ts {
                             SchemaTypeSet::Single(t) => *t,
-                            SchemaTypeSet::Multiple(ts) => {
-                                ts.iter().copied().find(|t| *t != SchemaType::Null).unwrap_or(SchemaType::Object)
-                            }
+                            SchemaTypeSet::Multiple(ts) => ts
+                                .iter()
+                                .copied()
+                                .find(|t| *t != SchemaType::Null)
+                                .unwrap_or(SchemaType::Object),
                         };
                         match t {
                             SchemaType::Integer => {
-                                if let Some(fmt) = &obj.format { format!("integer ({fmt})") }
-                                else { "integer".to_string() }
+                                if let Some(fmt) = &obj.format {
+                                    format!("integer ({fmt})")
+                                } else {
+                                    "integer".to_string()
+                                }
                             }
                             SchemaType::Number => "number".to_string(),
                             SchemaType::Boolean => "boolean".to_string(),
@@ -203,7 +242,9 @@ fn render_param_type(schema: &Option<oas3::spec::Schema>, spec: &OpenApiV3Spec) 
                     }
                 };
                 if !obj.enum_values.is_empty() {
-                    let vals = obj.enum_values.iter()
+                    let vals = obj
+                        .enum_values
+                        .iter()
                         .filter_map(|v| v.as_str())
                         .map(|s| format!("`{s}`"))
                         .collect::<Vec<_>>()
@@ -213,9 +254,10 @@ fn render_param_type(schema: &Option<oas3::spec::Schema>, spec: &OpenApiV3Spec) 
                     base
                 }
             }
-            ObjectOrReference::Ref { ref_path, .. } => {
-                ref_path.strip_prefix("#/components/schemas/").unwrap_or(ref_path).to_string()
-            }
+            ObjectOrReference::Ref { ref_path, .. } => ref_path
+                .strip_prefix("#/components/schemas/")
+                .unwrap_or(ref_path)
+                .to_string(),
         },
     }
 }

@@ -13,7 +13,11 @@ fn render(spec: &OpenApiV3Spec) -> String {
 
     let mut categories: Vec<String> = Vec::new();
     for (_, _, op) in spec.operations() {
-        let cat = op.tags.first().cloned().unwrap_or_else(|| "general".to_string());
+        let cat = op
+            .tags
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "general".to_string());
         let cat_slug = to_snake_case(&cat);
         if !categories.contains(&cat_slug) {
             categories.push(cat_slug);
@@ -37,7 +41,9 @@ fn render(spec: &OpenApiV3Spec) -> String {
     );
 
     if has_auth {
-        out.push_str("- [authentication/index.md](./authentication/index.md): Authentication workflows\n");
+        out.push_str(
+            "- [authentication/index.md](./authentication/index.md): Authentication workflows\n",
+        );
     }
 
     for cat in &categories {
@@ -45,7 +51,7 @@ fn render(spec: &OpenApiV3Spec) -> String {
     }
 
     if has_schemas {
-        out.push_str("- [schemas/index.md](./schemas/index.md): Data schemas\n");
+        out.push_str("- [schemas/index.md](./schemas/index.md): Data schemas, only if you need them alone. They are already included in endpoints.\n");
     }
 
     out

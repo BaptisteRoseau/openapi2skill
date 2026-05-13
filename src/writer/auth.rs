@@ -1,11 +1,13 @@
 use oas3::{
-    spec::{Flows, ObjectOrReference, SecurityScheme},
     OpenApiV3Spec,
+    spec::{Flows, ObjectOrReference, SecurityScheme},
 };
 use std::path::{Path, PathBuf};
 
 pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBuf, String)>) {
-    let Some(components) = &spec.components else { return };
+    let Some(components) = &spec.components else {
+        return;
+    };
     if components.security_schemes.is_empty() {
         return;
     }
@@ -36,7 +38,11 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
 
 fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
     match scheme {
-        SecurityScheme::ApiKey { description, name: header_name, location } => {
+        SecurityScheme::ApiKey {
+            description,
+            name: header_name,
+            location,
+        } => {
             let desc = description.as_deref().unwrap_or("");
             let mut out = format!("# {name}\n\n");
             if !desc.is_empty() {
@@ -48,13 +54,20 @@ fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
             out
         }
 
-        SecurityScheme::Http { description, scheme, bearer_format } => {
+        SecurityScheme::Http {
+            description,
+            scheme,
+            bearer_format,
+        } => {
             let desc = description.as_deref().unwrap_or("");
             let mut out = format!("# {name}\n\n");
             if !desc.is_empty() {
                 out.push_str(&format!("{desc}\n\n"));
             }
-            let format_hint = bearer_format.as_deref().map(|f| format!(" ({f})")).unwrap_or_default();
+            let format_hint = bearer_format
+                .as_deref()
+                .map(|f| format!(" ({f})"))
+                .unwrap_or_default();
             out.push_str(&format!(
                 "HTTP `{scheme}` authentication{format_hint}.\n\n```http\nGET /example HTTP/1.1\nAuthorization: {scheme} <token>\n```\n"
             ));
@@ -69,17 +82,24 @@ fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
             }
             out.push_str("OAuth 2.0 authentication.\n\n");
             out.push_str(&render_flows(flows));
-            out.push_str("\n```http\nGET /example HTTP/1.1\nAuthorization: Bearer <access_token>\n```\n");
+            out.push_str(
+                "\n```http\nGET /example HTTP/1.1\nAuthorization: Bearer <access_token>\n```\n",
+            );
             out
         }
 
-        SecurityScheme::OpenIdConnect { description, open_id_connect_url } => {
+        SecurityScheme::OpenIdConnect {
+            description,
+            open_id_connect_url,
+        } => {
             let desc = description.as_deref().unwrap_or("");
             let mut out = format!("# {name}\n\n");
             if !desc.is_empty() {
                 out.push_str(&format!("{desc}\n\n"));
             }
-            out.push_str(&format!("OpenID Connect — discovery URL: `{open_id_connect_url}`\n"));
+            out.push_str(&format!(
+                "OpenID Connect — discovery URL: `{open_id_connect_url}`\n"
+            ));
             out
         }
 
@@ -99,7 +119,10 @@ fn render_flows(flows: &Flows) -> String {
     let mut out = String::new();
 
     if let Some(f) = &flows.implicit {
-        out.push_str(&format!("**Authorization URL:** `{}`\n\n", f.authorization_url));
+        out.push_str(&format!(
+            "**Authorization URL:** `{}`\n\n",
+            f.authorization_url
+        ));
         out.push_str(&render_scopes(&f.scopes));
     }
     if let Some(f) = &flows.password {
