@@ -1,7 +1,7 @@
 use oas3::OpenApiV3Spec;
 use std::path::{Path, PathBuf};
 
-use super::to_snake_case;
+use super::{category_label, op_category};
 
 pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBuf, String)>) {
     writes.push((dir.join("SKILL.md"), render(spec)));
@@ -11,16 +11,12 @@ fn render(spec: &OpenApiV3Spec) -> String {
     let title = &spec.info.title;
     let description = spec.info.description.as_deref().unwrap_or("");
 
-    let mut categories: Vec<String> = Vec::new();
-    for (_, _, op) in spec.operations() {
-        let cat = op
-            .tags
-            .first()
-            .cloned()
-            .unwrap_or_else(|| "general".to_string());
-        let cat_slug = to_snake_case(&cat);
-        if !categories.contains(&cat_slug) {
-            categories.push(cat_slug);
+    let mut categories: Vec<(String, String)> = Vec::new();
+    for (path, _, op) in spec.operations() {
+        let slug = op_category(op, &path);
+        if !categories.iter().any(|(s, _)| s == &slug) {
+            let desc = category_label(&slug);
+            categories.push((slug, desc));
         }
     }
 
@@ -83,10 +79,8 @@ fn render(spec: &OpenApiV3Spec) -> String {
         );
     }
 
-    for cat in &categories {
-        out.push_str(&format!(
-            "- [endpoints/{cat}/index.md](./endpoints/{cat}/index.md)\n"
-        ));
+    if !categories.is_empty() {
+        out.push_str("- [endpoints/index.md](./endpoints/index.md): API endpoints\n");
     }
 
     if has_schemas {

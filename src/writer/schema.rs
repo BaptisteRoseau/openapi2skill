@@ -1,8 +1,12 @@
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+};
+
 use oas3::{
     OpenApiV3Spec,
     spec::{ObjectOrReference, ObjectSchema, Schema, SchemaType, SchemaTypeSet},
 };
-use std::path::{Path, PathBuf};
 
 use super::camel_to_kebab;
 
@@ -50,13 +54,24 @@ fn render_schema_file(name: &str, schema: &Schema, spec: &OpenApiV3Spec) -> Stri
     }
 
     out.push_str("```jsonc\n");
-    out.push_str(&render_schema_jsonc(schema, spec));
+    // Schema definition files always inline everything (empty multi_use set).
+    out.push_str(&render_schema_jsonc(schema, spec, &HashSet::new()));
     out.push('\n');
     out.push_str("```\n");
     out
 }
 
-pub fn render_schema_jsonc(schema: &Schema, spec: &OpenApiV3Spec) -> String {
+/// Render a schema as a jsonc block.
+///
+/// `multi_use` — set of component schema names (e.g. `"error"`, `"payment_method"`) that appear
+/// in 2+ endpoint bodies. When a `$ref` to one of these is encountered it is replaced with a
+/// markdown link rather than inlined, keeping endpoint files concise.
+/// Pass an empty set to always inline (used for standalone schema files).
+pub fn render_schema_jsonc(
+    schema: &Schema,
+    spec: &OpenApiV3Spec,
+    multi_use: &HashSet<String>,
+) -> String {
     let resolved = match schema.resolve(spec) {
         Ok(s) => s,
         Err(_) => return "{}".to_string(),
@@ -65,13 +80,17 @@ pub fn render_schema_jsonc(schema: &Schema, spec: &OpenApiV3Spec) -> String {
     match resolved {
         Schema::Boolean(b) => b.0.to_string(),
         Schema::Object(oor) => match oor.as_ref() {
-            ObjectOrReference::Object(obj) => render_top_level_object(obj, spec),
+            ObjectOrReference::Object(obj) => render_top_level_object(obj, spec, multi_use),
             ObjectOrReference::Ref { .. } => "{}".to_string(),
         },
     }
 }
 
-fn render_top_level_object(obj: &ObjectSchema, spec: &OpenApiV3Spec) -> String {
+fn render_top_level_object(
+    obj: &ObjectSchema,
+    spec: &OpenApiV3Spec,
+    multi_use: &HashSet<String>,
+) -> String {
     if obj
         .schema_type
         .as_ref()
@@ -81,7 +100,7 @@ fn render_top_level_object(obj: &ObjectSchema, spec: &OpenApiV3Spec) -> String {
         let item_lines = obj
             .items
             .as_ref()
-            .map(|items| array_item_lines(items, 1, spec))
+            .map(|items| array_item_lines(items, 1, spec, multi_use))
             .unwrap_or_else(|| vec!["  null".to_string()]);
         let mut lines = vec!["[".to_string()];
         lines.extend(item_lines);
@@ -99,7 +118,7 @@ fn render_top_level_object(obj: &ObjectSchema, spec: &OpenApiV3Spec) -> String {
     for (i, (name, schema)) in props.into_iter().enumerate() {
         let trail = if i + 1 == n { "" } else { "," };
         let is_req = obj.required.contains(name);
-        lines.extend(property_lines(name, schema, is_req, trail, 1, spec));
+        lines.extend(property_lines(name, schema, is_req, trail, 1, spec, multi_use));
     }
     lines.push("}".to_string());
     lines.join("\n")
@@ -112,9 +131,22 @@ pub(crate) fn property_lines(
     trail: &str,
     depth: usize,
     spec: &OpenApiV3Spec,
+    multi_use: &HashSet<String>,
 ) -> Vec<String> {
     let indent = "  ".repeat(depth);
     let req = if is_required { "required" } else { "optional" };
+
+    // Before resolving, check if this is a $ref to a multi-use named schema.
+    // If so, emit a link instead of inlining the full definition.
+    if let Some(ref_name) = schema_ref_name(schema) {
+        if multi_use.contains(ref_name) {
+            let slug = camel_to_kebab(ref_name);
+            let link = format!("../../schemas/{slug}.md");
+            return vec![format!(
+                "{indent}\"{name}\": {{ /* [{ref_name}]({link}) */ }}{trail}  // object, {req}"
+            )];
+        }
+    }
 
     let resolved = match schema.resolve(spec) {
         Ok(s) => s,
@@ -134,7 +166,7 @@ pub(crate) fn property_lines(
         }
         Schema::Object(oor) => match oor.as_ref() {
             ObjectOrReference::Object(obj) => {
-                object_property_lines(name, obj, is_required, trail, depth, spec)
+                object_property_lines(name, obj, is_required, trail, depth, spec, multi_use)
             }
             ObjectOrReference::Ref { .. } => {
                 vec![format!(
@@ -152,6 +184,7 @@ fn object_property_lines(
     trail: &str,
     depth: usize,
     spec: &OpenApiV3Spec,
+    multi_use: &HashSet<String>,
 ) -> Vec<String> {
     let indent = "  ".repeat(depth);
     let req = if is_required { "required" } else { "optional" };
@@ -169,7 +202,7 @@ fn object_property_lines(
         let item_lines = obj
             .items
             .as_ref()
-            .map(|items| array_item_lines(items, depth + 1, spec))
+            .map(|items| array_item_lines(items, depth + 1, spec, multi_use))
             .unwrap_or_else(|| vec![format!("{}null", "  ".repeat(depth + 1))]);
 
         let mut lines = vec![format!("{indent}\"{name}\": [  // {comment}")];
@@ -193,6 +226,7 @@ fn object_property_lines(
                 ptrail,
                 depth + 1,
                 spec,
+                multi_use,
             ));
         }
         lines.push(format!("{close}}}{trail}"));
@@ -207,8 +241,25 @@ fn object_property_lines(
     )]
 }
 
-fn array_item_lines(items: &Schema, depth: usize, spec: &OpenApiV3Spec) -> Vec<String> {
+fn array_item_lines(
+    items: &Schema,
+    depth: usize,
+    spec: &OpenApiV3Spec,
+    multi_use: &HashSet<String>,
+) -> Vec<String> {
     let indent = "  ".repeat(depth);
+
+    // Check for $ref to multi-use schema before resolving.
+    if let Some(ref_name) = schema_ref_name(items) {
+        if multi_use.contains(ref_name) {
+            let slug = camel_to_kebab(ref_name);
+            let link = format!("../../schemas/{slug}.md");
+            return vec![format!(
+                "{indent}{{ /* [{ref_name}]({link}) */ }}"
+            )];
+        }
+    }
+
     let resolved = match items.resolve(spec) {
         Ok(s) => s,
         Err(_) => return vec![format!("{indent}null")],
@@ -232,6 +283,7 @@ fn array_item_lines(items: &Schema, depth: usize, spec: &OpenApiV3Spec) -> Vec<S
                         ptrail,
                         depth + 1,
                         spec,
+                        multi_use,
                     ));
                 }
                 lines.push(format!("{close}}}"));
@@ -242,6 +294,19 @@ fn array_item_lines(items: &Schema, depth: usize, spec: &OpenApiV3Spec) -> Vec<S
             }
             ObjectOrReference::Ref { .. } => vec![format!("{indent}null")],
         },
+    }
+}
+
+/// Extract the component schema name from a `$ref`, if present.
+/// Returns `Some("payment_method")` for `$ref: "#/components/schemas/payment_method"`.
+fn schema_ref_name(schema: &Schema) -> Option<&str> {
+    match schema {
+        Schema::Object(oor) => match oor.as_ref() {
+            ObjectOrReference::Ref { ref_path, .. } => ref_path
+                .strip_prefix("#/components/schemas/"),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -299,7 +364,8 @@ fn primitive_example(obj: &ObjectSchema) -> String {
 }
 
 fn type_comment(obj: &ObjectSchema, req: &str) -> String {
-    let base = match obj.schema_type.as_ref().map(primary_type) {
+    let ty = obj.schema_type.as_ref().map(primary_type);
+    let base = match ty {
         Some(SchemaType::Integer) => {
             if let Some(fmt) = &obj.format {
                 format!("integer ({fmt})")
@@ -316,7 +382,54 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
         None => "any".to_string(),
     };
 
-    let mut parts = vec![base, req.to_string()];
+    let mut parts = vec![base];
+
+    // format — for non-integer types (integers already include format in `base`)
+    if let Some(fmt) = &obj.format {
+        if !matches!(ty, Some(SchemaType::Integer)) {
+            parts.push(format!("format: {fmt}"));
+        }
+    }
+
+    parts.push(req.to_string());
+
+    // Numeric range constraints
+    if let Some(min) = &obj.minimum {
+        parts.push(format!("min: {min}"));
+    }
+    if let Some(xmin) = &obj.exclusive_minimum {
+        parts.push(format!("xmin: {xmin}"));
+    }
+    if let Some(max) = &obj.maximum {
+        parts.push(format!("max: {max}"));
+    }
+    if let Some(xmax) = &obj.exclusive_maximum {
+        parts.push(format!("xmax: {xmax}"));
+    }
+
+    // String length / pattern constraints
+    if let Some(min_len) = obj.min_length {
+        parts.push(format!("minLength: {min_len}"));
+    }
+    if let Some(max_len) = obj.max_length {
+        parts.push(format!("maxLength: {max_len}"));
+    }
+    if let Some(pat) = &obj.pattern {
+        // Truncate very long patterns to stay readable
+        if pat.len() > 60 {
+            parts.push(format!("pattern: \"{}…\"", &pat[..57]));
+        } else {
+            parts.push(format!("pattern: \"{pat}\""));
+        }
+    }
+
+    // Array size constraints
+    if let Some(min_items) = obj.min_items {
+        parts.push(format!("minItems: {min_items}"));
+    }
+    if let Some(max_items) = obj.max_items {
+        parts.push(format!("maxItems: {max_items}"));
+    }
 
     if !obj.enum_values.is_empty() {
         let vals = obj
@@ -326,16 +439,6 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
             .collect::<Vec<_>>()
             .join(", ");
         parts.push(format!("enum: {vals}"));
-    }
-
-    if let Some(fmt) = &obj.format {
-        // format already included in integer case; add for others
-        if !matches!(
-            obj.schema_type.as_ref().map(primary_type),
-            Some(SchemaType::Integer)
-        ) {
-            parts.insert(1, format!("format: {fmt}"));
-        }
     }
 
     parts.join(", ")

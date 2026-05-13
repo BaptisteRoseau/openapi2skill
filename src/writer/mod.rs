@@ -3,7 +3,7 @@ mod endpoint;
 mod schema;
 mod skill;
 
-use oas3::OpenApiV3Spec;
+use oas3::{OpenApiV3Spec, spec::Operation};
 use std::path::{Path, PathBuf};
 use tokio::fs;
 
@@ -40,6 +40,33 @@ pub async fn openapi2skill(
     }
 
     Ok(())
+}
+
+/// Determine the category slug for an operation.
+/// Uses the first tag if present, otherwise derives from the first non-version path segment.
+pub(crate) fn op_category(op: &Operation, path: &str) -> String {
+    if let Some(tag) = op.tags.first() {
+        return to_snake_case(tag);
+    }
+    // Fallback: take the first path segment that isn't a bare version prefix (v1, v2, …).
+    path.split('/')
+        .filter(|s| !s.is_empty())
+        .find(|s| {
+            !(s.starts_with('v') && s.len() > 1 && s[1..].chars().all(|c| c.is_ascii_digit()))
+        })
+        .map(|s| to_snake_case(s))
+        .unwrap_or_else(|| "general".to_string())
+}
+
+/// Human-readable label for a category slug, used in SKILL.md index links.
+pub(crate) fn category_label(slug: &str) -> String {
+    let name = slug.replace('_', " ");
+    let mut chars = name.chars();
+    let capitalized = match chars.next() {
+        None => String::new(),
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+    };
+    format!("{capitalized} endpoints")
 }
 
 pub(crate) fn to_snake_case(s: &str) -> String {
