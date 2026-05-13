@@ -34,7 +34,7 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
     }
 
     for (cat_slug, entries) in &by_category {
-        let cat_dir = dir.join(cat_slug);
+        let cat_dir = dir.join("endpoints").join(cat_slug);
 
         let index_links: Vec<String> = entries
             .iter()
@@ -62,8 +62,17 @@ fn render_endpoint(path: &str, method: &str, op: &Operation, spec: &OpenApiV3Spe
         "| **Auth** | {} |\n",
         render_security(&op.security)
     ));
-    if op.request_body.is_some() {
-        out.push_str("| **Content-Type** | `application/json` |\n");
+    if let Some(body_ref) = &op.request_body
+        && let Ok(body) = body_ref.resolve(spec)
+        && !body.content.is_empty()
+    {
+        let types = body
+            .content
+            .keys()
+            .map(|k| format!("`{k}`"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!("| **Content-Type** | {types} |\n"));
     }
     out.push('\n');
 

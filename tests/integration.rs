@@ -18,18 +18,24 @@ async fn test_generates_expected_files() {
     assert!(p.join("SKILL.md").exists(), "missing SKILL.md");
 
     // Endpoint category
-    assert!(p.join("pet/index.md").exists(), "missing pet/index.md");
     assert!(
-        p.join("pet/get-pet-find-by-status-multiple-examples.md")
-            .exists(),
-        "missing get-pet-find-by-status-multiple-examples.md"
+        p.join("endpoints/pet/index.md").exists(),
+        "missing endpoints/pet/index.md"
     );
     assert!(
-        p.join("pet/get-pet-find-by-status-single-example.md")
+        p.join("endpoints/pet/get-pet-find-by-status-multiple-examples.md")
             .exists(),
-        "missing get-pet-find-by-status-single-example.md"
+        "missing endpoints/pet/get-pet-find-by-status-multiple-examples.md"
     );
-    assert!(p.join("pet/post-pet.md").exists(), "missing post-pet.md");
+    assert!(
+        p.join("endpoints/pet/get-pet-find-by-status-single-example.md")
+            .exists(),
+        "missing endpoints/pet/get-pet-find-by-status-single-example.md"
+    );
+    assert!(
+        p.join("endpoints/pet/post-pet.md").exists(),
+        "missing endpoints/pet/post-pet.md"
+    );
 
     // Schemas
     assert!(

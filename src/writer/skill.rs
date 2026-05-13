@@ -37,8 +37,45 @@ fn render(spec: &OpenApiV3Spec) -> String {
         .unwrap_or(false);
 
     let mut out = format!(
-        "---\nname: {title}\ndescription: {description}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n---\n\n# {title} Documentation\n\nRead the following files depending on your current needs:\n\n"
+        "---\nname: {title}\ndescription: {description}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n---\n\n# {title} Documentation\n\n"
     );
+
+    // API metadata
+    let version = &spec.info.version;
+    out.push_str(&format!("**Version:** {version}"));
+    if let Some(license) = &spec.info.license {
+        if let Some(url) = &license.url {
+            out.push_str(&format!(" | **License:** [{}]({})", license.name, url));
+        } else {
+            out.push_str(&format!(" | **License:** {}", license.name));
+        }
+    }
+    if let Some(tos) = &spec.info.terms_of_service {
+        out.push_str(&format!(" | **Terms of Service:** {tos}"));
+    }
+    out.push_str("\n\n");
+
+    if !spec.servers.is_empty() {
+        out.push_str("**Servers:**\n");
+        for server in &spec.servers {
+            if let Some(desc) = &server.description {
+                out.push_str(&format!("- {} — {}\n", server.url, desc));
+            } else {
+                out.push_str(&format!("- {}\n", server.url));
+            }
+        }
+        out.push('\n');
+    }
+
+    if let Some(ext) = &spec.external_docs {
+        if let Some(desc) = &ext.description {
+            out.push_str(&format!("**External Docs:** [{desc}]({})\n\n", ext.url));
+        } else {
+            out.push_str(&format!("**External Docs:** {}\n\n", ext.url));
+        }
+    }
+
+    out.push_str("Read the following files depending on your current needs:\n\n");
 
     if has_auth {
         out.push_str(
@@ -47,7 +84,9 @@ fn render(spec: &OpenApiV3Spec) -> String {
     }
 
     for cat in &categories {
-        out.push_str(&format!("- [{cat}/index.md](./{cat}/index.md)\n"));
+        out.push_str(&format!(
+            "- [endpoints/{cat}/index.md](./endpoints/{cat}/index.md)\n"
+        ));
     }
 
     if has_schemas {
