@@ -1,13 +1,29 @@
 use openapi2skill::writer::openapi2skill;
+use rstest::rstest;
 
-async fn load_spec(path: &str) -> oas3::OpenApiV3Spec {
+async fn load_spec(path: &std::path::Path) -> oas3::OpenApiV3Spec {
     let content = tokio::fs::read_to_string(path).await.unwrap();
-    oas3::from_json(&content).unwrap()
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("yaml") | Some("yml") => serde_yaml::from_str(&content).unwrap(),
+        _ => oas3::from_json(&content).unwrap(),
+    }
+}
+
+#[rstest]
+#[tokio::test]
+async fn test_spec_writes_successfully(
+    #[files("tests/assets/*.json")] #[files("tests/assets/*.yaml")] #[files("tests/assets/*.yml")]
+    path: std::path::PathBuf,
+) {
+    let spec = load_spec(&path).await;
+    let tmp = tempfile::tempdir().unwrap();
+    openapi2skill(&spec, Some(tmp.path())).await.unwrap();
+    assert!(tmp.path().join("SKILL.md").exists(), "{path:?}: missing SKILL.md");
 }
 
 #[tokio::test]
 async fn test_generates_expected_files() {
-    let spec = load_spec("tests/assets/openapi.json").await;
+    let spec = load_spec(std::path::Path::new("tests/assets/openapi.json")).await;
     let tmp = tempfile::tempdir().unwrap();
 
     openapi2skill(&spec, Some(tmp.path())).await.unwrap();
@@ -52,7 +68,7 @@ async fn test_generates_expected_files() {
 
 #[tokio::test]
 async fn test_no_auth_dir_when_no_schemes() {
-    let spec = load_spec("tests/assets/openapi.json").await;
+    let spec = load_spec(std::path::Path::new("tests/assets/openapi.json")).await;
     let tmp = tempfile::tempdir().unwrap();
 
     openapi2skill(&spec, Some(tmp.path())).await.unwrap();
