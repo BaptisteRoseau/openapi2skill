@@ -68,8 +68,21 @@ fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
                 .as_deref()
                 .map(|f| format!(" ({f})"))
                 .unwrap_or_default();
+            // Capitalize scheme for the Authorization header (Basic, Bearer, Digest, …).
+            let scheme_header = {
+                let mut s = scheme.clone();
+                if let Some(c) = s.get_mut(0..1) {
+                    c.make_ascii_uppercase();
+                }
+                s
+            };
+            let placeholder = match scheme.to_ascii_lowercase().as_str() {
+                "basic" => "<base64(username:password)>",
+                "bearer" => "<token>",
+                _ => "<credentials>",
+            };
             out.push_str(&format!(
-                "HTTP `{scheme}` authentication{format_hint}.\n\n```http\nGET /example HTTP/1.1\nAuthorization: {scheme} <token>\n```\n"
+                "HTTP `{scheme}` authentication{format_hint}.\n\n```http\nGET /example HTTP/1.1\nAuthorization: {scheme_header} {placeholder}\n```\n"
             ));
             out
         }
