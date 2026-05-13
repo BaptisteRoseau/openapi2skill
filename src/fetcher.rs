@@ -1,9 +1,8 @@
 use crate::error::O2SError;
-use oapi::{OApi, OApiDocument};
-use sppparse::SparseRoot;
+use oas3::OpenApiV3Spec;
 use std::path::PathBuf;
 
-pub async fn load_oapi(link: &str) -> Result<OApi, O2SError> {
+pub async fn load_oapi(link: &str) -> Result<OpenApiV3Spec, O2SError> {
     if link.starts_with("http://") || link.starts_with("https://") {
         load_http(link).await
     } else {
@@ -11,17 +10,13 @@ pub async fn load_oapi(link: &str) -> Result<OApi, O2SError> {
     }
 }
 
-async fn load_http(url: &str) -> Result<OApi, O2SError> {
-    let content = reqwest::get(url).await?
-        .error_for_status()?
-        .text().await?;
+async fn load_http(url: &str) -> Result<OpenApiV3Spec, O2SError> {
+    let content = reqwest::get(url).await?.error_for_status()?.text().await?;
     let ext = url_extension(url);
-    let value = parse_content(&content, &ext)?;
-    let root = SparseRoot::<OApiDocument>::new_from_value(value, PathBuf::from("openapi.json"), vec![])?;
-    Ok(OApi::new(root))
+    parse_content(&content, &ext)
 }
 
-async fn load_file(path_str: &str) -> Result<OApi, O2SError> {
+async fn load_file(path_str: &str) -> Result<OpenApiV3Spec, O2SError> {
     let content = tokio::fs::read_to_string(path_str).await?;
     let path = PathBuf::from(path_str);
     let ext = path
@@ -29,9 +24,7 @@ async fn load_file(path_str: &str) -> Result<OApi, O2SError> {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-    let value = parse_content(&content, &ext)?;
-    let root = SparseRoot::<OApiDocument>::new_from_value(value, path, vec![])?;
-    Ok(OApi::new(root))
+    parse_content(&content, &ext)
 }
 
 fn url_extension(url: &str) -> String {
@@ -43,12 +36,12 @@ fn url_extension(url: &str) -> String {
     }
 }
 
-fn parse_content(content: &str, ext: &str) -> Result<serde_json::Value, O2SError> {
+fn parse_content(content: &str, ext: &str) -> Result<OpenApiV3Spec, O2SError> {
     match ext {
-        "json" => Ok(serde_json::from_str(content)?),
+        "json" => Ok(oas3::from_json(content)?),
         "yaml" | "yml" => Ok(serde_yaml::from_str(content)?),
         other => {
-            if let Ok(parsed) = serde_json::from_str(content) {
+            if let Ok(parsed) = oas3::from_json(content) {
                 return Ok(parsed);
             }
             if let Ok(parsed) = serde_yaml::from_str(content) {
