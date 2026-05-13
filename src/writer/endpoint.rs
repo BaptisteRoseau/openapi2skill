@@ -7,6 +7,7 @@ use oas3::{
     OpenApiV3Spec,
     spec::{ObjectOrReference, Operation, ParameterIn, Response, Schema},
 };
+use tracing::info;
 
 use super::{op_category, path_to_slug};
 use crate::writer::schema as schema_writer;
@@ -43,7 +44,9 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
             format!("- [{desc}](./{slug}/index.md)\n")
         })
         .collect();
-    writes.push((dir.join("endpoints").join("index.md"), top_index));
+    let write_path = (dir.join("endpoints").join("index.md"), top_index);
+    info!("Writing {:?}", write_path);
+    writes.push(write_path);
 
     for (cat_slug, entries) in &by_category {
         let cat_dir = dir.join("endpoints").join(cat_slug);
@@ -53,10 +56,14 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
             .map(|(filename, summary, _)| format!("- [{summary}](./{filename})"))
             .collect();
         let index = index_links.join("\n") + "\n";
-        writes.push((cat_dir.join("index.md"), index));
+        let write_path = (cat_dir.join("index.md"), index);
+        info!("Writing {:?}", write_path);
+        writes.push(write_path);
 
         for (filename, _, content) in entries {
-            writes.push((cat_dir.join(filename), content.clone()));
+            let write_path = (cat_dir.join(filename), content.clone());
+            info!("Writing {:?}", write_path);
+            writes.push(write_path);
         }
     }
 }
@@ -71,14 +78,14 @@ fn collect_multi_use_schemas(spec: &OpenApiV3Spec) -> HashSet<String> {
         let mut op_refs: HashSet<String> = HashSet::new();
 
         // Request body
-        if let Some(body_ref) = &op.request_body {
-            if let Ok(body) = body_ref.resolve(spec) {
-                for mt in body.content.values() {
-                    if let Some(schema) = &mt.schema {
-                        if let Some(name) = top_level_ref_name(schema) {
-                            op_refs.insert(name.to_string());
-                        }
-                    }
+        if let Some(body_ref) = &op.request_body
+            && let Ok(body) = body_ref.resolve(spec)
+        {
+            for mt in body.content.values() {
+                if let Some(schema) = &mt.schema
+                    && let Some(name) = top_level_ref_name(schema)
+                {
+                    op_refs.insert(name.to_string());
                 }
             }
         }
@@ -94,10 +101,10 @@ fn collect_multi_use_schemas(spec: &OpenApiV3Spec) -> HashSet<String> {
                     },
                 };
                 for mt in resp.content.values() {
-                    if let Some(schema) = &mt.schema {
-                        if let Some(name) = top_level_ref_name(schema) {
-                            op_refs.insert(name.to_string());
-                        }
+                    if let Some(schema) = &mt.schema
+                        && let Some(name) = top_level_ref_name(schema)
+                    {
+                        op_refs.insert(name.to_string());
                     }
                 }
             }
@@ -293,15 +300,15 @@ fn render_schema_block(
 ) {
     use super::camel_to_kebab;
 
-    if let Some(ref_name) = top_level_ref_name(schema) {
-        if multi_use.contains(ref_name) {
-            let slug = camel_to_kebab(ref_name);
-            out.push_str(&format!(
-                "See [{}](../../schemas/{}.md)\n\n",
-                ref_name, slug
-            ));
-            return;
-        }
+    if let Some(ref_name) = top_level_ref_name(schema)
+        && multi_use.contains(ref_name)
+    {
+        let slug = camel_to_kebab(ref_name);
+        out.push_str(&format!(
+            "See [{}](../../schemas/{}.md)\n\n",
+            ref_name, slug
+        ));
+        return;
     }
 
     out.push_str("```jsonc\n");

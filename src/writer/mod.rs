@@ -54,7 +54,7 @@ pub(crate) fn op_category(op: &Operation, path: &str) -> String {
         .find(|s| {
             !(s.starts_with('v') && s.len() > 1 && s[1..].chars().all(|c| c.is_ascii_digit()))
         })
-        .map(|s| to_snake_case(s))
+        .map(to_snake_case)
         .unwrap_or_else(|| "general".to_string())
 }
 

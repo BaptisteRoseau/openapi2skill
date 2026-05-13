@@ -7,6 +7,7 @@ use oas3::{
     OpenApiV3Spec,
     spec::{ObjectOrReference, ObjectSchema, Schema, SchemaType, SchemaTypeSet},
 };
+use tracing::info;
 
 use super::camel_to_kebab;
 
@@ -24,7 +25,9 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
     for (name, schema) in &components.schemas {
         let filename = format!("{}.md", camel_to_kebab(name));
         let content = render_schema_file(name, schema, spec);
-        writes.push((schema_dir.join(&filename), content));
+        let write_path = (schema_dir.join(&filename), content);
+        info!("Writing {:?}", write_path);
+        writes.push(write_path);
         index_links.push((filename, name.clone()));
     }
 
@@ -35,7 +38,9 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
         .join("\n")
         + "\n";
 
-    writes.push((schema_dir.join("index.md"), index));
+    let write_path = (schema_dir.join("index.md"), index);
+    info!("Writing {:?}", write_path);
+    writes.push(write_path);
 }
 
 fn render_schema_file(name: &str, schema: &Schema, spec: &OpenApiV3Spec) -> String {
@@ -140,14 +145,14 @@ pub(crate) fn property_lines(
 
     // Before resolving, check if this is a $ref to a multi-use named schema.
     // If so, emit a link instead of inlining the full definition.
-    if let Some(ref_name) = schema_ref_name(schema) {
-        if multi_use.contains(ref_name) {
-            let slug = camel_to_kebab(ref_name);
-            let link = format!("../../schemas/{slug}.md");
-            return vec![format!(
-                "{indent}\"{name}\": {{ /* [{ref_name}]({link}) */ }}{trail}  // object, {req}"
-            )];
-        }
+    if let Some(ref_name) = schema_ref_name(schema)
+        && multi_use.contains(ref_name)
+    {
+        let slug = camel_to_kebab(ref_name);
+        let link = format!("../../schemas/{slug}.md");
+        return vec![format!(
+            "{indent}\"{name}\": {{ /* [{ref_name}]({link}) */ }}{trail}  // object, {req}"
+        )];
     }
 
     let resolved = match schema.resolve(spec) {
@@ -252,12 +257,12 @@ fn array_item_lines(
     let indent = "  ".repeat(depth);
 
     // Check for $ref to multi-use schema before resolving.
-    if let Some(ref_name) = schema_ref_name(items) {
-        if multi_use.contains(ref_name) {
-            let slug = camel_to_kebab(ref_name);
-            let link = format!("../../schemas/{slug}.md");
-            return vec![format!("{indent}{{ /* [{ref_name}]({link}) */ }}")];
-        }
+    if let Some(ref_name) = schema_ref_name(items)
+        && multi_use.contains(ref_name)
+    {
+        let slug = camel_to_kebab(ref_name);
+        let link = format!("../../schemas/{slug}.md");
+        return vec![format!("{indent}{{ /* [{ref_name}]({link}) */ }}")];
     }
 
     let resolved = match items.resolve(spec) {
@@ -386,10 +391,10 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
     let mut parts = vec![base];
 
     // format — for non-integer types (integers already include format in `base`)
-    if let Some(fmt) = &obj.format {
-        if !matches!(ty, Some(SchemaType::Integer)) {
-            parts.push(format!("format: {fmt}"));
-        }
+    if let Some(fmt) = &obj.format
+        && !matches!(ty, Some(SchemaType::Integer))
+    {
+        parts.push(format!("format: {fmt}"));
     }
 
     parts.push(req.to_string());

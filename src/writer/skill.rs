@@ -1,10 +1,13 @@
 use oas3::OpenApiV3Spec;
 use std::path::{Path, PathBuf};
+use tracing::info;
 
 use super::{category_label, op_category};
 
 pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBuf, String)>) {
-    writes.push((dir.join("SKILL.md"), render(spec)));
+    let write_path = (dir.join("SKILL.md"), render(spec));
+    info!("Writing {:?}", write_path);
+    writes.push(write_path);
 }
 
 fn render(spec: &OpenApiV3Spec) -> String {

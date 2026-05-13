@@ -3,6 +3,7 @@ use oas3::{
     spec::{Flows, ObjectOrReference, SecurityScheme},
 };
 use std::path::{Path, PathBuf};
+use tracing::info;
 
 pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBuf, String)>) {
     let Some(components) = &spec.components else {
@@ -22,7 +23,9 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
         };
         let filename = format!("{}.md", name.to_lowercase().replace(' ', "-"));
         let content = render_scheme(name, scheme);
-        writes.push((auth_dir.join(&filename), content));
+        let write_path = (auth_dir.join(&filename), content);
+        info!("Writing {:?}", write_path);
+        writes.push(write_path);
         index_links.push((filename, name.clone()));
     }
 
@@ -33,7 +36,9 @@ pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBu
         .join("\n")
         + "\n";
 
-    writes.push((auth_dir.join("index.md"), index));
+    let write_path = (auth_dir.join("index.md"), index);
+    info!("Writing {:?}", write_path);
+    writes.push(write_path);
 }
 
 fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {

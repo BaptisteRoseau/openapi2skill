@@ -158,5 +158,5 @@ Run: `cargo test`
 Before returning to the user, make sure the code is formatted and linter and tests pass:
 
 - `cargo fmt`
-- `cargo clippy` → `cargo clippy --fix --lib -p openapi2skill -- ` to auto-fix issues → fix remaining issues → repeat until no issue found
-- `cargo test` 
+- `cargo clippy --fix --allow-dirty --lib -p openapi2skill --` → `cargo clippy --fix --lib -p openapi2skill -- ` to auto-fix issues → fix remaining issues → repeat until no issue found
+- `cargo test`

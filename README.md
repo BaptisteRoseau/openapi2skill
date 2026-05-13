@@ -11,3 +11,4 @@
 - [ ] Download script
 - [ ] Cargo release
 - [ ] README
+- [ ] Follow https://agentskills.io/home standard ?
