@@ -5,7 +5,7 @@ Rust CLI that converts an OpenAPI 3.x specification into a tree of markdown file
 ## Usage
 
 ```
-mcp2skill <path-or-url> [--output-dir <dir>]
+openapi2skill <path-or-url> [--output-dir <dir>]
 ```
 
 `<path-or-url>` accepts a file path (`.json`, `.yaml`, `.yml`) or an HTTP/HTTPS URL. The output directory defaults to the snake_case title of the API (e.g. `swagger_petstore/`).
@@ -114,7 +114,7 @@ The `oapi` crate uses `SparseSelector<T>` / `OperatorSelector<T>` requiring `.ge
 
 ### Crate structure
 
-`src/lib.rs` re-exports all modules publicly so integration tests in `tests/` can access them via `mcp2skill::writer::openapi2skill`.
+`src/lib.rs` re-exports all modules publicly so integration tests in `tests/` can access them via `openapi2skill::writer::openapi2skill`.
 
 ### Writer pipeline (`src/writer/`)
 

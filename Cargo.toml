@@ -1,5 +1,5 @@
 [package]
-name = "mcp2skill"
+name = "openapi2skill"
 version = "0.1.0"
 edition = "2024"
 

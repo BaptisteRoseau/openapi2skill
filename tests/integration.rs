@@ -1,4 +1,4 @@
-use mcp2skill::writer::openapi2skill;
+use openapi2skill::writer::openapi2skill;
 
 async fn load_spec(path: &str) -> oas3::OpenApiV3Spec {
     let content = tokio::fs::read_to_string(path).await.unwrap();

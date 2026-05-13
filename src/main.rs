@@ -1,5 +1,5 @@
 use clap::Parser;
-use mcp2skill::{cli::CliConfig, fetcher::load_oapi, writer::openapi2skill};
+use openapi2skill::{cli::CliConfig, fetcher::load_oapi, writer::openapi2skill};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
