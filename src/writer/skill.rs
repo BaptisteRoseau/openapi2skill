@@ -1,13 +1,23 @@
-use oas3::OpenApiV3Spec;
 use std::path::{Path, PathBuf};
+
+use oas3::OpenApiV3Spec;
 use tracing::info;
 
-use super::{category_label, op_category};
+use super::utils::{CollectWrites, category_label, op_category};
 
-pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBuf, String)>) {
-    let write_path = (dir.join("SKILL.md"), render(spec));
-    info!("Writing {:?}", write_path);
-    writes.push(write_path);
+pub(super) struct Writer;
+
+impl CollectWrites for Writer {
+    fn collect_writes(
+        &self,
+        spec: &OpenApiV3Spec,
+        dir: &Path,
+        writes: &mut Vec<(PathBuf, String)>,
+    ) {
+        let write_path = (dir.join("SKILL.md"), render(spec));
+        info!("Writing {:?}", write_path);
+        writes.push(write_path);
+    }
 }
 
 fn render(spec: &OpenApiV3Spec) -> String {
@@ -38,10 +48,14 @@ fn render(spec: &OpenApiV3Spec) -> String {
     let mut out = format!(
         "---\nname: {title}\ndescription: {description}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
     );
+    out.push_str(&render_metadata(spec));
+    out.push_str(&render_index(has_auth, has_schemas, &categories));
+    out
+}
 
-    // API metadata
-    let version = &spec.info.version;
-    out.push_str(&format!("**Version:** {version}"));
+fn render_metadata(spec: &OpenApiV3Spec) -> String {
+    let mut out = format!("**Version:** {}", spec.info.version);
+
     if let Some(license) = &spec.info.license {
         if let Some(url) = &license.url {
             out.push_str(&format!(" | **License:** [{}]({})", license.name, url));
@@ -74,21 +88,21 @@ fn render(spec: &OpenApiV3Spec) -> String {
         }
     }
 
-    out.push_str("Read the following files depending on your current needs:\n\n");
+    out
+}
 
+fn render_index(has_auth: bool, has_schemas: bool, categories: &[(String, String)]) -> String {
+    let mut out = "Read the following files depending on your current needs:\n\n".to_string();
     if has_auth {
         out.push_str(
             "- [authentication/index.md](./authentication/index.md): Authentication workflows\n",
         );
     }
-
     if !categories.is_empty() {
         out.push_str("- [endpoints/index.md](./endpoints/index.md): API endpoints\n");
     }
-
     if has_schemas {
         out.push_str("- [schemas/index.md](./schemas/index.md): Data schemas, only if you need them alone. They are already included in endpoints.\n");
     }
-
     out
 }

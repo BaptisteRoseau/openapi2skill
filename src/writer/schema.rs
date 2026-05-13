@@ -9,38 +9,40 @@ use oas3::{
 };
 use tracing::info;
 
-use super::camel_to_kebab;
+use super::utils::{CollectWrites, build_index, camel_to_kebab};
 
-pub fn collect_writes(spec: &OpenApiV3Spec, dir: &Path, writes: &mut Vec<(PathBuf, String)>) {
-    let Some(components) = &spec.components else {
-        return;
-    };
-    if components.schemas.is_empty() {
-        return;
-    }
+pub(super) struct Writer;
 
-    let schema_dir = dir.join("schemas");
-    let mut index_links: Vec<(String, String)> = Vec::new();
+impl CollectWrites for Writer {
+    fn collect_writes(
+        &self,
+        spec: &OpenApiV3Spec,
+        dir: &Path,
+        writes: &mut Vec<(PathBuf, String)>,
+    ) {
+        let Some(components) = &spec.components else {
+            return;
+        };
+        if components.schemas.is_empty() {
+            return;
+        }
 
-    for (name, schema) in &components.schemas {
-        let filename = format!("{}.md", camel_to_kebab(name));
-        let content = render_schema_file(name, schema, spec);
-        let write_path = (schema_dir.join(&filename), content);
+        let schema_dir = dir.join("schemas");
+        let mut index_links: Vec<(String, String)> = Vec::new();
+
+        for (name, schema) in &components.schemas {
+            let filename = format!("{}.md", camel_to_kebab(name));
+            let content = render_schema_file(name, schema, spec);
+            let write_path = (schema_dir.join(&filename), content);
+            info!("Writing {:?}", write_path);
+            writes.push(write_path);
+            index_links.push((filename, name.clone()));
+        }
+
+        let write_path = (schema_dir.join("index.md"), build_index(&index_links));
         info!("Writing {:?}", write_path);
         writes.push(write_path);
-        index_links.push((filename, name.clone()));
     }
-
-    let index: String = index_links
-        .iter()
-        .map(|(file, name)| format!("- [{name}](./{file})"))
-        .collect::<Vec<_>>()
-        .join("\n")
-        + "\n";
-
-    let write_path = (schema_dir.join("index.md"), index);
-    info!("Writing {:?}", write_path);
-    writes.push(write_path);
 }
 
 fn render_schema_file(name: &str, schema: &Schema, spec: &OpenApiV3Spec) -> String {
@@ -59,19 +61,12 @@ fn render_schema_file(name: &str, schema: &Schema, spec: &OpenApiV3Spec) -> Stri
     }
 
     out.push_str("```jsonc\n");
-    // Schema definition files always inline everything (empty multi_use set).
     out.push_str(&render_schema_jsonc(schema, spec, &HashSet::new()));
     out.push('\n');
     out.push_str("```\n");
     out
 }
 
-/// Render a schema as a jsonc block.
-///
-/// `multi_use` — set of component schema names (e.g. `"error"`, `"payment_method"`) that appear
-/// in 2+ endpoint bodies. When a `$ref` to one of these is encountered it is replaced with a
-/// markdown link rather than inlined, keeping endpoint files concise.
-/// Pass an empty set to always inline (used for standalone schema files).
 pub fn render_schema_jsonc(
     schema: &Schema,
     spec: &OpenApiV3Spec,
@@ -143,8 +138,6 @@ pub(crate) fn property_lines(
     let indent = "  ".repeat(depth);
     let req = if is_required { "required" } else { "optional" };
 
-    // Before resolving, check if this is a $ref to a multi-use named schema.
-    // If so, emit a link instead of inlining the full definition.
     if let Some(ref_name) = schema_ref_name(schema)
         && multi_use.contains(ref_name)
     {
@@ -240,7 +233,6 @@ fn object_property_lines(
         return lines;
     }
 
-    // Primitive
     let example = primitive_example(obj);
     let comment = type_comment(obj, req);
     vec![format!(
@@ -256,7 +248,6 @@ fn array_item_lines(
 ) -> Vec<String> {
     let indent = "  ".repeat(depth);
 
-    // Check for $ref to multi-use schema before resolving.
     if let Some(ref_name) = schema_ref_name(items)
         && multi_use.contains(ref_name)
     {
@@ -302,8 +293,6 @@ fn array_item_lines(
     }
 }
 
-/// Extract the component schema name from a `$ref`, if present.
-/// Returns `Some("payment_method")` for `$ref: "#/components/schemas/payment_method"`.
 fn schema_ref_name(schema: &Schema) -> Option<&str> {
     match schema {
         Schema::Object(oor) => match oor.as_ref() {
@@ -321,7 +310,6 @@ fn array_item_type_label(array_obj: &ObjectSchema, _spec: &OpenApiV3Spec) -> Str
         return "any".to_string();
     };
 
-    // Check for $ref before resolving to preserve the name
     match items.as_ref() {
         Schema::Object(oor) => match oor.as_ref() {
             ObjectOrReference::Ref { ref_path, .. } => ref_path
@@ -390,7 +378,6 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
 
     let mut parts = vec![base];
 
-    // format — for non-integer types (integers already include format in `base`)
     if let Some(fmt) = &obj.format
         && !matches!(ty, Some(SchemaType::Integer))
     {
@@ -399,16 +386,6 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
 
     parts.push(req.to_string());
 
-    if let Some(desc) = &obj.description {
-        let desc = desc.trim();
-        if desc.len() > 120 {
-            parts.push(format!("{}…", &desc[..117]));
-        } else {
-            parts.push(desc.to_string());
-        }
-    }
-
-    // Numeric range constraints
     if let Some(min) = &obj.minimum {
         parts.push(format!("min: {min}"));
     }
@@ -421,8 +398,6 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
     if let Some(xmax) = &obj.exclusive_maximum {
         parts.push(format!("xmax: {xmax}"));
     }
-
-    // String length / pattern constraints
     if let Some(min_len) = obj.min_length {
         parts.push(format!("minLength: {min_len}"));
     }
@@ -430,15 +405,8 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
         parts.push(format!("maxLength: {max_len}"));
     }
     if let Some(pat) = &obj.pattern {
-        // Truncate very long patterns to stay readable
-        if pat.len() > 60 {
-            parts.push(format!("pattern: \"{}…\"", &pat[..57]));
-        } else {
-            parts.push(format!("pattern: \"{pat}\""));
-        }
+        parts.push(format!("pattern: \"{pat}\""));
     }
-
-    // Array size constraints
     if let Some(min_items) = obj.min_items {
         parts.push(format!("minItems: {min_items}"));
     }
@@ -454,6 +422,10 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
             .collect::<Vec<_>>()
             .join(", ");
         parts.push(format!("enum: {vals}"));
+    }
+
+    if let Some(desc) = &obj.description {
+        parts.push(format!("\"\"\"{}\"\"\"", desc.trim()));
     }
 
     parts.join(", ")

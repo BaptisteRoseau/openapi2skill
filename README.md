@@ -1,6 +1,6 @@
 # TODO
 
-- [ ] Add logging for verbose mode -> info above each file
+- [X] Add logging for verbose mode -> info above each file
 - [ ] Cleanup the modules
 - [ ] Docstring on the modules: what will their files look like ?
 - [ ] Pre-commit scripts (test/format/lint)
