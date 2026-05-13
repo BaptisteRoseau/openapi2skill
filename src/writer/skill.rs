@@ -37,7 +37,7 @@ fn render(spec: &OpenApiV3Spec) -> String {
         .unwrap_or(false);
 
     let mut out = format!(
-        "---\nname: {title}\ndescription: {description}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n---\n\n# {title} Documentation\n\n"
+        "---\nname: {title}\ndescription: {description}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
     );
 
     // API metadata
