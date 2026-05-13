@@ -12,13 +12,18 @@ async fn load_spec(path: &std::path::Path) -> oas3::OpenApiV3Spec {
 #[rstest]
 #[tokio::test]
 async fn test_spec_writes_successfully(
-    #[files("tests/assets/*.json")] #[files("tests/assets/*.yaml")] #[files("tests/assets/*.yml")]
+    #[files("tests/assets/*.json")]
+    #[files("tests/assets/*.yaml")]
+    #[files("tests/assets/*.yml")]
     path: std::path::PathBuf,
 ) {
     let spec = load_spec(&path).await;
     let tmp = tempfile::tempdir().unwrap();
     openapi2skill(&spec, Some(tmp.path())).await.unwrap();
-    assert!(tmp.path().join("SKILL.md").exists(), "{path:?}: missing SKILL.md");
+    assert!(
+        tmp.path().join("SKILL.md").exists(),
+        "{path:?}: missing SKILL.md"
+    );
 }
 
 #[tokio::test]

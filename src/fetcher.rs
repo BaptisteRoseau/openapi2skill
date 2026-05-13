@@ -1,6 +1,7 @@
 use crate::error::O2SError;
 use oas3::OpenApiV3Spec;
 use std::path::PathBuf;
+use tracing::info;
 
 pub async fn load_oapi(link: &str) -> Result<OpenApiV3Spec, O2SError> {
     if link.starts_with("http://") || link.starts_with("https://") {
@@ -11,12 +12,14 @@ pub async fn load_oapi(link: &str) -> Result<OpenApiV3Spec, O2SError> {
 }
 
 async fn load_http(url: &str) -> Result<OpenApiV3Spec, O2SError> {
+    info!("Fetching {url}");
     let content = reqwest::get(url).await?.error_for_status()?.text().await?;
     let ext = url_extension(url);
     parse_content(&content, &ext)
 }
 
 async fn load_file(path_str: &str) -> Result<OpenApiV3Spec, O2SError> {
+    info!("Loading file {path_str}");
     let content = tokio::fs::read_to_string(path_str).await?;
     let path = PathBuf::from(path_str);
     let ext = path
@@ -47,7 +50,7 @@ fn parse_content(content: &str, ext: &str) -> Result<OpenApiV3Spec, O2SError> {
             if let Ok(parsed) = serde_yaml::from_str(content) {
                 return Ok(parsed);
             }
-            Err(O2SError::UnknownExtension(other.to_string()))
+            Err(O2SError::InvalidFormat(other.to_string()))
         }
     }
 }

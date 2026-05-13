@@ -14,6 +14,6 @@ pub enum O2SError {
     #[error("Failed to parse YAML: {0}")]
     YamlParse(#[from] serde_yaml::Error),
 
-    #[error("Unknown file extension '{0}': expected json, yaml, or yml")]
-    UnknownExtension(String),
+    #[error("Invalid format '{0}': expected json, yaml, or yml")]
+    InvalidFormat(String),
 }

@@ -12,7 +12,7 @@ pub struct CliConfig {
     #[arg(short, long)]
     pub output_dir: Option<PathBuf>,
 
-    /// Disable output
+    /// Enable output
     #[arg(short, long, default_value_t = false)]
-    pub quiet: bool,
+    pub verbose: bool,
 }

@@ -118,7 +118,9 @@ fn render_top_level_object(
     for (i, (name, schema)) in props.into_iter().enumerate() {
         let trail = if i + 1 == n { "" } else { "," };
         let is_req = obj.required.contains(name);
-        lines.extend(property_lines(name, schema, is_req, trail, 1, spec, multi_use));
+        lines.extend(property_lines(
+            name, schema, is_req, trail, 1, spec, multi_use,
+        ));
     }
     lines.push("}".to_string());
     lines.join("\n")
@@ -254,9 +256,7 @@ fn array_item_lines(
         if multi_use.contains(ref_name) {
             let slug = camel_to_kebab(ref_name);
             let link = format!("../../schemas/{slug}.md");
-            return vec![format!(
-                "{indent}{{ /* [{ref_name}]({link}) */ }}"
-            )];
+            return vec![format!("{indent}{{ /* [{ref_name}]({link}) */ }}")];
         }
     }
 
@@ -302,8 +302,9 @@ fn array_item_lines(
 fn schema_ref_name(schema: &Schema) -> Option<&str> {
     match schema {
         Schema::Object(oor) => match oor.as_ref() {
-            ObjectOrReference::Ref { ref_path, .. } => ref_path
-                .strip_prefix("#/components/schemas/"),
+            ObjectOrReference::Ref { ref_path, .. } => {
+                ref_path.strip_prefix("#/components/schemas/")
+            }
             _ => None,
         },
         _ => None,
