@@ -3,26 +3,26 @@ use oapi::{OApi, OApiDocument};
 use sppparse::SparseRoot;
 use std::path::PathBuf;
 
-pub fn load_oapi(link: &str) -> Result<OApi, O2SError> {
+pub async fn load_oapi(link: &str) -> Result<OApi, O2SError> {
     if link.starts_with("http://") || link.starts_with("https://") {
-        load_http(link)
+        load_http(link).await
     } else {
-        load_file(link)
+        load_file(link).await
     }
 }
 
-fn load_http(url: &str) -> Result<OApi, O2SError> {
-    let content = reqwest::blocking::get(url)?
+async fn load_http(url: &str) -> Result<OApi, O2SError> {
+    let content = reqwest::get(url).await?
         .error_for_status()?
-        .text()?;
+        .text().await?;
     let ext = url_extension(url);
     let value = parse_content(&content, &ext)?;
     let root = SparseRoot::<OApiDocument>::new_from_value(value, PathBuf::from("openapi.json"), vec![])?;
     Ok(OApi::new(root))
 }
 
-fn load_file(path_str: &str) -> Result<OApi, O2SError> {
-    let content = std::fs::read_to_string(path_str)?;
+async fn load_file(path_str: &str) -> Result<OApi, O2SError> {
+    let content = tokio::fs::read_to_string(path_str).await?;
     let path = PathBuf::from(path_str);
     let ext = path
         .extension()
