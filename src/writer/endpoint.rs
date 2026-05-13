@@ -143,6 +143,10 @@ fn render_endpoint(
     out.push_str("| | |\n|--|--|\n");
     out.push_str(&format!("| **Method** | `{method}` |\n"));
     out.push_str(&format!("| **URL** | `{path}` |\n"));
+    if spec.servers.len() == 1 {
+        let base = spec.servers[0].url.trim_end_matches('/');
+        out.push_str(&format!("| **Full URL** | `{base}{path}` |\n"));
+    }
     out.push_str(&format!(
         "| **Auth** | {} |\n",
         render_security(&op.security, spec)
@@ -158,7 +162,7 @@ fn render_endpoint(
             .map(|k| format!("`{k}`"))
             .collect::<Vec<_>>()
             .join(", ");
-        out.push_str(&format!("| **Content-Type** | {types} |\n"));
+        out.push_str(&format!("| **Request Content-Type** | {types} |\n"));
     }
     out.push('\n');
 
@@ -242,6 +246,15 @@ fn render_endpoint(
                 },
             };
             out.push_str(&format!("## Response {code}\n\n"));
+            if !resp.content.is_empty() {
+                let types = resp
+                    .content
+                    .keys()
+                    .map(|k| format!("`{k}`"))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                out.push_str(&format!("**Response Content-Type:** {types}\n\n"));
+            }
             if let Some(desc) = &resp.description {
                 out.push_str(desc);
                 out.push_str("\n\n");

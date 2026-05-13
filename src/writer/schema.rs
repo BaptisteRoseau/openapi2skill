@@ -394,6 +394,15 @@ fn type_comment(obj: &ObjectSchema, req: &str) -> String {
 
     parts.push(req.to_string());
 
+    if let Some(desc) = &obj.description {
+        let desc = desc.trim();
+        if desc.len() > 120 {
+            parts.push(format!("{}…", &desc[..117]));
+        } else {
+            parts.push(desc.to_string());
+        }
+    }
+
     // Numeric range constraints
     if let Some(min) = &obj.minimum {
         parts.push(format!("min: {min}"));

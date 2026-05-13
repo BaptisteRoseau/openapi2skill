@@ -12,8 +12,6 @@ openapi2skill <path-or-url> [--output-dir <dir>]
 
 ## Output format
 
-The `example/` directory contains hand-written reference files that define the exact format the writer must produce. **Always consult these before modifying writer logic.**
-
 ### File tree
 
 ```
