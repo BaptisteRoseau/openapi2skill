@@ -108,10 +108,6 @@ Rules:
 
 ## Architecture
 
-### Key decision: `oas3` not `oapi`
-
-The `oapi` crate uses `SparseSelector<T>` / `OperatorSelector<T>` requiring `.get()?` everywhere. `oas3 = "0.22.0"` has direct pub fields and `Schema::resolve(&spec)` which recursively follows `$ref`s. Always use `oas3`.
-
 ### Crate structure
 
 `src/lib.rs` re-exports all modules publicly so integration tests in `tests/` can access them via `openapi2skill::writer::openapi2skill`.
@@ -147,16 +143,22 @@ use oas3::spec::{
 
 `Response.description` is `Option<String>` (not `String`).
 
+### Coding Best Practices
+
+- Prefer splitting code into modules with multiple files instead of a giant one.
+- Write small helper functions instead of an all-in-one one.
+- `mod.rs` and `lib.rs` should not contain custom code, only `mod` and `use` instructions.
+
 ## Tests
 
 Integration tests only (`tests/integration.rs`). They load `tests/assets/openapi.json` (Swagger Petstore, 3.0.2), run the writer into a `tempfile::tempdir()`, and assert the expected file paths exist. No content checks.
 
 Run: `cargo test`
 
-## What's next
+## Checklist
 
-- Refine the jsonc rendering based on real-world API feedback.
-- Handle `allOf` / `anyOf` / `oneOf` composition in schemas.
-- Support `$ref` in path-level parameters.
-- Optionally print the output directory path on success.
-- Add a `--quiet` flag implementation (flag exists in CLI but writer always writes).
+Before returning to the user, make sure the code is formatted and linter and tests pass:
+
+- `cargo fmt`
+- `cargo clippy` → `cargo clippy --fix --lib -p openapi2skill -- ` to auto-fix issues → fix remaining issues → repeat until no issue found
+- `cargo test` 
