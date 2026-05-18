@@ -24,34 +24,17 @@ fn render(spec: &OpenApiV3Spec) -> String {
     let title = &spec.info.title;
     let description = spec.info.description.as_deref().unwrap_or("");
 
-    let mut categories: Vec<(String, String)> = Vec::new();
-    for (path, _, op) in spec.operations() {
-        let slug = op_category(op, &path);
-        if !categories.iter().any(|(s, _)| s == &slug) {
-            let desc = category_label(&slug);
-            categories.push((slug, desc));
-        }
-    }
-
-    let has_auth = spec
-        .components
-        .as_ref()
-        .map(|c| !c.security_schemes.is_empty())
-        .unwrap_or(false);
-
-    let has_schemas = spec
-        .components
-        .as_ref()
-        .map(|c| !c.schemas.is_empty())
-        .unwrap_or(false);
-
-    let mut out = format!(
-        "---\nname: {title}\ndescription: The API documentation and specifiations of {title}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
-    );
+    let mut out = render_skill_header(title);
     out.push_str(&render_metadata(spec));
     out.push_str(&render_decription_and_navigation(description));
-    out.push_str(&render_index(has_auth, has_schemas, &categories));
+    out.push_str(&render_index(spec));
     out
+}
+
+fn render_skill_header(title: &str) -> String {
+    format!(
+        "---\nname: {title}\ndescription: The API documentation and specifiations of {title}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
+    )
 }
 
 fn render_metadata(spec: &OpenApiV3Spec) -> String {
@@ -101,7 +84,28 @@ fn render_decription_and_navigation(description: &str) -> String {
     out
 }
 
-fn render_index(has_auth: bool, has_schemas: bool, categories: &[(String, String)]) -> String {
+fn render_index(spec: &OpenApiV3Spec) -> String {
+    let has_auth = spec
+        .components
+        .as_ref()
+        .map(|c| !c.security_schemes.is_empty())
+        .unwrap_or(false);
+
+    let has_schemas = spec
+        .components
+        .as_ref()
+        .map(|c| !c.schemas.is_empty())
+        .unwrap_or(false);
+
+    let mut categories: Vec<(String, String)> = Vec::new();
+    for (path, _, op) in spec.operations() {
+        let slug = op_category(op, &path);
+        if !categories.iter().any(|(s, _)| s == &slug) {
+            let desc = category_label(&slug);
+            categories.push((slug, desc));
+        }
+    }
+
     let mut out = "Read the following files depending on your current needs:\n\n".to_string();
     if has_auth {
         out.push_str(
