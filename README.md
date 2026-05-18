@@ -1,6 +1,9 @@
 # TODO
 
 - [X] Add logging for verbose mode -> info above each file
+- [ ] Move the API description in the SKILL.md instead of its metadata
+- [ ] Add more real-world swaggers in the tests (opendatasoft and grafana are breaking)
+- [ ] Add a registry of known swaggers links
 - [ ] Cleanup the modules
 - [ ] Docstring on the modules: what will their files look like ?
 - [ ] Pre-commit scripts (test/format/lint)
@@ -11,4 +14,4 @@
 - [ ] Download script
 - [ ] Cargo release
 - [ ] README
-- [ ] Follow https://agentskills.io/home standard ?
+- [ ] Add navigation instructions in the SKILL.md
