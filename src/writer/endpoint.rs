@@ -52,7 +52,7 @@ impl CollectWrites for Writer {
             .map(|slug| format!("- [{}](./{slug}/index.md)\n", category_label(slug)))
             .collect();
         let write_path = (dir.join("endpoints").join("index.md"), top_index);
-        info!("Writing {:?}", write_path);
+        info!("Writing {:?}", write_path.0);
         writes.push(write_path);
 
         for (cat_slug, entries) in &by_category {
@@ -76,12 +76,12 @@ fn push_category_writes(
         .join("\n")
         + "\n";
     let write_path = (cat_dir.join("index.md"), index);
-    info!("Writing {:?}", write_path);
+    info!("Writing {:?}", write_path.0);
     writes.push(write_path);
 
     for (filename, _, content) in entries {
         let write_path = (cat_dir.join(filename), content.clone());
-        info!("Writing {:?}", write_path);
+        info!("Writing {:?}", write_path.0);
         writes.push(write_path);
     }
 }

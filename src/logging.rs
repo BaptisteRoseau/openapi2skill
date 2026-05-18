@@ -1,14 +1,14 @@
-use log::LevelFilter;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
 
 pub fn init_logger(enable: bool) {
     if !enable {
         return;
     }
 
-    env_logger::builder()
-        .format_timestamp_millis()
-        .format_module_path(false)
-        .format_target(false)
-        .filter_level(LevelFilter::Info)
+    FmtSubscriber::builder()
+        .with_max_level(Level::INFO)
+        .without_time()
+        .with_target(false)
         .init();
 }

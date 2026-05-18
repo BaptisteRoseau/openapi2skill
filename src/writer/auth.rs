@@ -35,13 +35,13 @@ impl CollectWrites for Writer {
             let filename = format!("{}.md", name.to_lowercase().replace(' ', "-"));
             let content = render_scheme(name, scheme);
             let write_path = (auth_dir.join(&filename), content);
-            info!("Writing {:?}", write_path);
+            info!("Writing {:?}", write_path.0);
             writes.push(write_path);
             index_links.push((filename, name.clone()));
         }
 
         let write_path = (auth_dir.join("index.md"), build_index(&index_links));
-        info!("Writing {:?}", write_path);
+        info!("Writing {:?}", write_path.0);
         writes.push(write_path);
     }
 }

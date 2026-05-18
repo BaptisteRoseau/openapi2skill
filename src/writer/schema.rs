@@ -34,13 +34,13 @@ impl CollectWrites for Writer {
             let filename = format!("{}.md", camel_to_kebab(name));
             let content = render_schema_file(name, schema, spec);
             let write_path = (schema_dir.join(&filename), content);
-            info!("Writing {:?}", write_path);
+            info!("Writing {:?}", write_path.0);
             writes.push(write_path);
             index_links.push((filename, name.clone()));
         }
 
         let write_path = (schema_dir.join("index.md"), build_index(&index_links));
-        info!("Writing {:?}", write_path);
+        info!("Writing {:?}", write_path.0);
         writes.push(write_path);
     }
 }

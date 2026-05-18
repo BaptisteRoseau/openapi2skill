@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use oas3::OpenApiV3Spec;
 use tokio::fs;
+use tracing::info;
 
 use super::utils::{CollectWrites, to_snake_case};
 use super::{auth, endpoint, schema, skill};
@@ -26,7 +27,10 @@ pub async fn openapi2skill(
         w.collect_writes(spec, &dir, &mut writes);
     }
 
-    write_all(writes).await
+    write_all(writes).await?;
+    info!("Wrote skill under {:?}", dir);
+
+    Ok(())
 }
 
 async fn write_all(writes: Vec<(PathBuf, String)>) -> Result<(), anyhow::Error> {

@@ -15,7 +15,7 @@ impl CollectWrites for Writer {
         writes: &mut Vec<(PathBuf, String)>,
     ) {
         let write_path = (dir.join("SKILL.md"), render(spec));
-        info!("Writing {:?}", write_path);
+        info!("Writing {:?}", write_path.0);
         writes.push(write_path);
     }
 }
@@ -46,9 +46,10 @@ fn render(spec: &OpenApiV3Spec) -> String {
         .unwrap_or(false);
 
     let mut out = format!(
-        "---\nname: {title}\ndescription: {description}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
+        "---\nname: {title}\ndescription: The API documentation and specifiations of {title}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
     );
     out.push_str(&render_metadata(spec));
+    out.push_str(&render_decription_and_navigation(description));
     out.push_str(&render_index(has_auth, has_schemas, &categories));
     out
 }
@@ -88,6 +89,15 @@ fn render_metadata(spec: &OpenApiV3Spec) -> String {
         }
     }
 
+    out
+}
+
+fn render_decription_and_navigation(description: &str) -> String {
+    let mut out = "".to_string();
+    if !description.is_empty() {
+        out.push_str(&format!("## API Description\n\n{description}\n\n"));
+    }
+    out.push_str("## Navigation\n\nGiven your goal, read the relevant index.md file links bellow and the ones they will be pointing to to read the endpoints descriptions you will need.\nAvoid using `ls` and `grep` as your first steps, but only when the indexes do not provide the information you need or if you have to search for a pattern.\nOther references will be given as markdown links, follow them only when required to achieve your goal. The less you read files, the better.");
     out
 }
 
