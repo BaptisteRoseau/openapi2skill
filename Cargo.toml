@@ -7,7 +7,7 @@ license = "MIT"
 homepage = "https://github.com/BaptisteRoseau/openapi2skill"
 repository = "https://github.com/BaptisteRoseau/openapi2skill"
 readme = "README.md"
-keywords = ["openapi", "claude", "ai", "skill", "markdown"]
+keywords = ["openapi", "claude", "ai", "agent", "skill", "markdown"]
 categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
