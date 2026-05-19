@@ -1,6 +1,6 @@
 [package]
 name = "openapi2skill"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "Convert an OpenAPI 3.x specification into an AI Agent Skill — a tree of markdown files an AI agent can navigate efficiently."
 license = "MIT"
@@ -26,3 +26,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 [dev-dependencies]
 rstest = "0.26.1"
 tempfile = "3"
+
+[profile.release]
+lto = true
+strip = true
