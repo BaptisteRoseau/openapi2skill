@@ -1,3 +1,40 @@
+//! Generates `SKILL.md` — the top-level entry point that the agent reads first.
+//!
+//! Output: one file at `{output_dir}/SKILL.md`.
+//!
+//! ---
+//! name: Grafana HTTP API.
+//! description: The API documentation and specifiations of Grafana HTTP API.
+//! allowed-tools:
+//!   - Read
+//!   - Bash(ls *)
+//!   - Bash(grep *)
+//!   - Bash(find *)
+//! ---
+//!
+//! # Grafana HTTP API. Documentation
+//!
+//! **Version:** 0.0.1
+//!
+//! **Servers:**
+//! - /api
+//!
+//! ## API Description
+//!
+//! The Grafana backend exposes an HTTP API, the same API is used by the frontend to do
+//! everything from saving dashboards, creating users and updating data sources.
+//!
+//! ## Navigation
+//!
+//! Given your goal, read the relevant index.md file links bellow and the ones they will be
+//! pointing to to read the endpoints descriptions you will need.
+//! ...
+//! Read the following files depending on your current needs:
+//!
+//! - [authentication/index.md](./authentication/index.md): Authentication workflows
+//! - [endpoints/index.md](./endpoints/index.md): API endpoints
+//! - [schemas/index.md](./schemas/index.md): Data schemas, only if you need them alone. They are already included in endpoints.
+
 use std::path::{Path, PathBuf};
 
 use oas3::OpenApiV3Spec;

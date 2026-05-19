@@ -1,3 +1,40 @@
+//! Generates `schemas/index.md` and one `schemas/{name}.md` per component schema.
+//! `render_schema_jsonc` is also used by `endpoint.rs` for inline request/response bodies.
+//!
+//! **`schemas/index.md`**
+//!
+//! - [Ack](./ack.md)
+//! - [ActiveSyncStatusDTO](./active-sync-status-d-t-o.md)
+//! - [AddDataSourceCommand](./add-data-source-command.md)
+//! - ...
+//!
+//! **`schemas/ack.md`** (empty object)
+//!
+//! # Ack
+//!
+//! ```jsonc
+//! {}
+//! ```
+//!
+//! **`schemas/add-data-source-command.md`** (object with properties)
+//!
+//! # AddDataSourceCommand
+//!
+//! ```jsonc
+//! {
+//!   "access": "string",       // string, optional
+//!   "basicAuth": false,        // boolean, optional
+//!   "basicAuthUser": "string", // string, optional
+//!   "isDefault": false,        // boolean, optional
+//!   "name": "string",          // string, required
+//!   "type": "string",          // string, required
+//!   "uid": "string",           // string, optional
+//!   "url": "string",           // string, optional
+//!   "jsonData": { /* [Json](../../schemas/json.md) */ },  // object, optional
+//!   "secureJsonData": { /* [Json](../../schemas/json.md) */ }  // object, optional
+//! }
+//! ```
+
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},

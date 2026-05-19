@@ -1,3 +1,38 @@
+//! Generates `authentication/index.md` and one file per security scheme.
+//!
+//! **`authentication/index.md`**
+//!
+//! - [api_key](./api_key.md)
+//! - [basic](./basic.md)
+//!
+//! **`authentication/api_key.md`** (ApiKey scheme)
+//!
+//! # api_key
+//!
+//! Add the following header to every request:
+//!
+//! | Header | Value |
+//! |--------|-------|
+//! | `Authorization` | Your API key |
+//!
+//! Location: `header`
+//!
+//! ```http
+//! GET /example HTTP/1.1
+//! Authorization: your-key-here
+//! ```
+//!
+//! **`authentication/basic.md`** (HTTP scheme)
+//!
+//! # basic
+//!
+//! HTTP `basic` authentication.
+//!
+//! ```http
+//! GET /example HTTP/1.1
+//! Authorization: Basic <base64(username:password)>
+//! ```
+
 use std::path::{Path, PathBuf};
 
 use oas3::{

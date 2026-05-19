@@ -1,3 +1,9 @@
+//! Entry point for the writer pipeline. Orchestrates all writers and flushes output to disk.
+//!
+//! [`openapi2skill`] runs each writer ([`skill`], [`auth`], [`endpoint`], [`schema`]) synchronously
+//! to collect `(PathBuf, String)` pairs, then spawns one `tokio::task` per pair for parallel async
+//! file I/O via [`write_all`].
+
 use std::path::{Path, PathBuf};
 
 use oas3::OpenApiV3Spec;

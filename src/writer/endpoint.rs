@@ -1,3 +1,64 @@
+//! Generates `endpoints/index.md`, one `endpoints/{category}/index.md` per operation tag,
+//! and one `endpoints/{category}/{method}-{slug}.md` per operation.
+//!
+//! **`endpoints/index.md`**
+//!
+//! - [Admin users endpoints](./admin_users/index.md)
+//! - [Dashboards endpoints](./dashboards/index.md)
+//! - ...
+//!
+//! **`endpoints/admin_users/index.md`**
+//!
+//! - [Create new user.](./post-admin-users.md)
+//! - [Delete global User.](./delete-admin-users-user_id.md)
+//! - ...
+//!
+//! **`endpoints/admin_users/post-admin-users.md`**
+//!
+//! # POST /admin/users
+//!
+//! | | |
+//! |--|--|
+//! | **Method** | `POST` |
+//! | **URL** | `/admin/users` |
+//! | **Full URL** | `/api/admin/users` |
+//! | **Auth** | basic |
+//! | **Request Content-Type** | `application/json` |
+//!
+//! ## Input
+//!
+//! ### Payload
+//!
+//! ```jsonc
+//! {
+//!   "email": "string",  // string, optional
+//!   "login": "string",  // string, optional
+//!   "name": "string",   // string, optional
+//!   "orgId": 0,         // integer (int64), optional
+//!   "password": "string"  // string, optional
+//! }
+//! ```
+//!
+//! ## Response 200
+//!
+//! **Response Content-Type:** `application/json`
+//!
+//! ```jsonc
+//! {
+//!   "id": 0,          // integer (int64), optional
+//!   "message": "string",  // string, optional
+//!   "uid": "string"   // string, optional
+//! }
+//! ```
+//!
+//! ## Response 400
+//!
+//! **Response Content-Type:** `application/json`
+//!
+//! BadRequestError is returned when the request is invalid and it cannot be processed.
+//!
+//! See [ErrorResponseBody](../../schemas/error-response-body.md)
+
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},

@@ -1,3 +1,14 @@
+//! Shared utilities used by all writers. Produces no output files of its own.
+//!
+//! - [`CollectWrites`]: trait implemented by each writer to append `(path, content)` pairs.
+//! - [`op_category`]: derives the snake_case category slug for an operation (first tag, or first path segment).
+//! - [`category_label`]: turns a slug like `admin_users` into `"Admin users endpoints"`.
+//! - [`path_to_slug`]: converts `/admin/users/{userId}` to `admin-users-user-id`.
+//! - [`camel_to_kebab`]: converts `AddDataSourceCommand` to `add-data-source-command`.
+//! - [`to_snake_case`]: converts arbitrary strings to `snake_case` (used for output dir name and category slugs).
+//! - [`primary_type`]: extracts the non-null type from a `SchemaTypeSet`.
+//! - [`build_index`]: builds a markdown bullet list of `[name](./file.md)` links.
+
 use std::path::{Path, PathBuf};
 
 use oas3::{
