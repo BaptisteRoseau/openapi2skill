@@ -108,7 +108,9 @@ Rules:
 
 ### Crate structure
 
-`src/lib.rs` re-exports all modules publicly so integration tests in `tests/` can access them via `openapi2skill::writer::openapi2skill`.
+`src/mod.rs` re-exports all modules publicly so integration tests in `tests/` can access them via `openapi2skill::writer::openapi2skill`.
+
+Do not write `src/lib.rs`. This is a binary-only crate.
 
 ### Writer pipeline (`src/writer/`)
 
@@ -145,11 +147,13 @@ use oas3::spec::{
 
 - Prefer splitting code into modules with multiple files instead of a giant one.
 - Write small helper functions instead of an all-in-one one.
-- `mod.rs` and `lib.rs` should not contain custom code, only `mod` and `use` instructions.
+- `mod.rs` should not contain custom code, only `mod` and `use` instructions.
 
 ## Tests
 
-Integration tests only (`tests/integration.rs`). They load `tests/assets/openapi.json` (Swagger Petstore, 3.0.2), run the writer into a `tempfile::tempdir()`, and assert the expected file paths exist. No content checks.
+Integration tests from `tests/integration.rs` load `tests/assets/*.[json,yaml,yml]`, runs the pipeline and ensure the skill has been generated smoothly. If you find a broken Open API 3.X spec, put it under `tests/assets/` and re-run the tests.
+
+Otherwise, split the code in small testable functions and only write relevant happy-path and edge case scenarios unit tests.
 
 Run: `cargo test`
 
@@ -158,5 +162,5 @@ Run: `cargo test`
 Before returning to the user, make sure the code is formatted and linter and tests pass:
 
 - `cargo fmt`
-- `cargo clippy --fix --allow-dirty --lib -p openapi2skill --` → `cargo clippy --fix --lib -p openapi2skill -- ` to auto-fix issues → fix remaining issues → repeat until no issue found
+- `cargo clippy --fix --allow-dirty --` → `cargo clippy --fix -- ` to auto-fix issues → fix remaining issues → repeat until no issue found
 - `cargo test`
