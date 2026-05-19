@@ -74,12 +74,18 @@ fn test_generates_expected_files() {
         out.join("schemas/index.md").exists(),
         "missing schemas/index.md"
     );
-    assert!(out.join("schemas/pet.md").exists(), "missing schemas/pet.md");
+    assert!(
+        out.join("schemas/pet.md").exists(),
+        "missing schemas/pet.md"
+    );
     assert!(
         out.join("schemas/category.md").exists(),
         "missing schemas/category.md"
     );
-    assert!(out.join("schemas/tag.md").exists(), "missing schemas/tag.md");
+    assert!(
+        out.join("schemas/tag.md").exists(),
+        "missing schemas/tag.md"
+    );
 }
 
 #[test]
