@@ -4,7 +4,8 @@ set -euo pipefail
 ##############################################################
 # INSTALL KNOWN API SKILLS
 # 
-# Install all the 
+# Install all the API skills from known_openapi.csv under
+# the .claude/skills directory.
 # ############################################################
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
