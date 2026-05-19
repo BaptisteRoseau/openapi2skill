@@ -19,9 +19,11 @@ SKILL.md                          ← frontmatter (name, description, allowed-to
 authentication/
   index.md                        ← bullet links to auth method files
   api_key.md / oauth.md / …       ← one file per security scheme
-{category}/                       ← one dir per operation tag (snake_case), "general" if untagged
-  index.md                        ← bullet links to endpoint files
-  {method}-{path-slug}.md         ← one file per operation
+endpoints/
+  index.md                        ← bullet links to category indexes
+  {category}/                     ← one dir per operation tag (snake_case), "general" if untagged
+    index.md                      ← bullet links to endpoint files
+    {method}-{path-slug}.md       ← one file per operation
 schemas/
   index.md                        ← bullet links to schema files
   {schema-name}.md                ← one file per component schema
@@ -108,9 +110,9 @@ Rules:
 
 ### Crate structure
 
-`src/mod.rs` re-exports all modules publicly so integration tests in `tests/` can access them via `openapi2skill::writer::openapi2skill`.
+`src/writer/mod.rs` exports only `pipeline::openapi2skill` publicly. All other submodules are private to the `writer` module.
 
-Do not write `src/lib.rs`. This is a binary-only crate.
+This is a binary-only crate — do not write `src/lib.rs`. Integration tests run the binary directly via `Command::new(env!("CARGO_BIN_EXE_openapi2skill"))`.
 
 ### Writer pipeline (`src/writer/`)
 
