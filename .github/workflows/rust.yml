@@ -35,13 +35,13 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-latest
-            target: aarch64-unknown-linux-gnu
+            target: aarch64-unknown-linux-musl
             artifact: openapi2skill-linux-arm64
             ext: ""
             use_cross: true
-          - runner: macos-13
-            target: x86_64-apple-darwin
-            artifact: openapi2skill-macos-amd64
+          - runner: ubuntu-latest
+            target: amd64-unknown-linux-musl
+            artifact: openapi2skill-linux-amd64
             ext: ""
             use_cross: false
           - runner: macos-14
