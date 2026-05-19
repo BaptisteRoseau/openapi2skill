@@ -32,7 +32,7 @@
           "count": { "type": ["null", "integer"] },
           "tags": { "type": ["array", "null"], "items": { "type": "string" } },
           "meta": { "type": ["object", "null"] },
-          "passthrough": { "type": "any" }
+          "passthrough": {}
         }
       }
     }
