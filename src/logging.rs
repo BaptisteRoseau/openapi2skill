@@ -9,6 +9,7 @@ pub fn init_logger(enable: bool) {
     FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .without_time()
+        .with_level(false)
         .with_target(false)
         .init();
 }
