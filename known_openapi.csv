@@ -1,0 +1,4 @@
+name,link
+Grafana,https://raw.githubusercontent.com/grafana/grafana/refs/heads/main/public/openapi3.json
+GitLab,https://gitlab.com/gitlab-org/gitlab/-/raw/master/doc/api/openapi/openapi_v3.yaml?ref_type=heads
+Stripe,https://raw.githubusercontent.com/stripe/openapi/refs/heads/master/latest/openapi.spec3.json
