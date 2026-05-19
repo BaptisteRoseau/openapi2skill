@@ -13,6 +13,14 @@ use super::utils::{CollectWrites, build_index, camel_to_kebab, primary_type};
 
 pub(super) struct Writer;
 
+/// State threaded through schema rendering. `visiting` tracks ref names currently
+/// on the recursion stack so cyclic `$ref`s render as links rather than overflowing.
+struct RenderCtx<'a> {
+    spec: &'a OpenApiV3Spec,
+    multi_use: &'a HashSet<String>,
+    visiting: HashSet<String>,
+}
+
 impl CollectWrites for Writer {
     fn collect_writes(
         &self,
@@ -73,7 +81,16 @@ pub fn render_schema_jsonc(
     spec: &OpenApiV3Spec,
     multi_use: &HashSet<String>,
 ) -> String {
-    let resolved = match schema.resolve(spec) {
+    let mut ctx = RenderCtx {
+        spec,
+        multi_use,
+        visiting: HashSet::new(),
+    };
+    render_schema_jsonc_inner(schema, &mut ctx)
+}
+
+fn render_schema_jsonc_inner(schema: &Schema, ctx: &mut RenderCtx<'_>) -> String {
+    let resolved = match schema.resolve(ctx.spec) {
         Ok(s) => s,
         Err(_) => return "{}".to_string(),
     };
@@ -81,43 +98,35 @@ pub fn render_schema_jsonc(
     match resolved {
         Schema::Boolean(b) => b.0.to_string(),
         Schema::Object(oor) => match oor.as_ref() {
-            ObjectOrReference::Object(obj) => render_top_level_object(obj, spec, multi_use),
+            ObjectOrReference::Object(obj) => render_top_level_object(obj, ctx),
             ObjectOrReference::Ref { .. } => "{}".to_string(),
         },
     }
 }
 
-fn render_top_level_object(
-    obj: &ObjectSchema,
-    spec: &OpenApiV3Spec,
-    multi_use: &HashSet<String>,
-) -> String {
+fn render_top_level_object(obj: &ObjectSchema, ctx: &mut RenderCtx<'_>) -> String {
     if obj
         .schema_type
         .as_ref()
         .map(|ts| ts.is_array_or_nullable_array())
         .unwrap_or(false)
     {
-        return render_top_level_array(obj, spec, multi_use);
+        return render_top_level_array(obj, ctx);
     }
     if obj.properties.is_empty() {
         return "{}".to_string();
     }
     let mut lines = vec!["{".to_string()];
-    lines.extend(render_properties_lines(obj, 1, spec, multi_use));
+    lines.extend(render_properties_lines(obj, 1, ctx));
     lines.push("}".to_string());
     lines.join("\n")
 }
 
-fn render_top_level_array(
-    obj: &ObjectSchema,
-    spec: &OpenApiV3Spec,
-    multi_use: &HashSet<String>,
-) -> String {
+fn render_top_level_array(obj: &ObjectSchema, ctx: &mut RenderCtx<'_>) -> String {
     let item_lines = obj
         .items
         .as_ref()
-        .map(|items| array_item_lines(items, 1, spec, multi_use))
+        .map(|items| array_item_lines(items, 1, ctx))
         .unwrap_or_else(|| vec!["  null".to_string()]);
     let mut lines = vec!["[".to_string()];
     lines.extend(item_lines);
@@ -128,36 +137,32 @@ fn render_top_level_array(
 fn render_properties_lines(
     obj: &ObjectSchema,
     depth: usize,
-    spec: &OpenApiV3Spec,
-    multi_use: &HashSet<String>,
+    ctx: &mut RenderCtx<'_>,
 ) -> Vec<String> {
     let props: Vec<_> = obj.properties.iter().collect();
     let n = props.len();
-    props
-        .into_iter()
-        .enumerate()
-        .flat_map(|(i, (name, schema))| {
-            let trail = if i + 1 == n { "" } else { "," };
-            let is_req = obj.required.contains(name);
-            property_lines(name, schema, is_req, trail, depth, spec, multi_use)
-        })
-        .collect()
+    let mut out = Vec::with_capacity(n);
+    for (i, (name, schema)) in props.into_iter().enumerate() {
+        let trail = if i + 1 == n { "" } else { "," };
+        let is_req = obj.required.contains(name);
+        out.extend(property_lines(name, schema, is_req, trail, depth, ctx));
+    }
+    out
 }
 
-pub(crate) fn property_lines(
+fn property_lines(
     name: &str,
     schema: &Schema,
     is_required: bool,
     trail: &str,
     depth: usize,
-    spec: &OpenApiV3Spec,
-    multi_use: &HashSet<String>,
+    ctx: &mut RenderCtx<'_>,
 ) -> Vec<String> {
     let indent = "  ".repeat(depth);
     let req = if is_required { "required" } else { "optional" };
 
     if let Some(ref_name) = schema_ref_name(schema)
-        && multi_use.contains(ref_name)
+        && (ctx.multi_use.contains(ref_name) || ctx.visiting.contains(ref_name))
     {
         let slug = camel_to_kebab(ref_name);
         let link = format!("../../schemas/{slug}.md");
@@ -166,7 +171,30 @@ pub(crate) fn property_lines(
         )];
     }
 
-    let resolved = match schema.resolve(spec) {
+    let pushed = schema_ref_name(schema).map(|n| n.to_string());
+    if let Some(n) = &pushed {
+        ctx.visiting.insert(n.clone());
+    }
+
+    let lines = resolved_property_lines(name, schema, is_required, trail, depth, ctx);
+
+    if let Some(n) = &pushed {
+        ctx.visiting.remove(n);
+    }
+    lines
+}
+
+fn resolved_property_lines(
+    name: &str,
+    schema: &Schema,
+    is_required: bool,
+    trail: &str,
+    depth: usize,
+    ctx: &mut RenderCtx<'_>,
+) -> Vec<String> {
+    let indent = "  ".repeat(depth);
+    let req = if is_required { "required" } else { "optional" };
+    let resolved = match schema.resolve(ctx.spec) {
         Ok(s) => s,
         Err(_) => {
             return vec![format!(
@@ -182,7 +210,7 @@ pub(crate) fn property_lines(
         )],
         Schema::Object(oor) => match oor.as_ref() {
             ObjectOrReference::Object(obj) => {
-                object_property_lines(name, obj, is_required, trail, depth, spec, multi_use)
+                object_property_lines(name, obj, is_required, trail, depth, ctx)
             }
             ObjectOrReference::Ref { .. } => vec![format!(
                 "{indent}\"{name}\": null{trail}  // unresolved ref, {req}"
@@ -197,8 +225,7 @@ fn object_property_lines(
     is_required: bool,
     trail: &str,
     depth: usize,
-    spec: &OpenApiV3Spec,
-    multi_use: &HashSet<String>,
+    ctx: &mut RenderCtx<'_>,
 ) -> Vec<String> {
     let indent = "  ".repeat(depth);
     let req = if is_required { "required" } else { "optional" };
@@ -209,11 +236,11 @@ fn object_property_lines(
         .map(|ts| ts.is_array_or_nullable_array())
         .unwrap_or(false)
     {
-        let item_type = array_item_type_label(obj, spec);
+        let item_type = array_item_type_label(obj, ctx.spec);
         let item_lines = obj
             .items
             .as_ref()
-            .map(|items| array_item_lines(items, depth + 1, spec, multi_use))
+            .map(|items| array_item_lines(items, depth + 1, ctx))
             .unwrap_or_else(|| vec![format!("{}null", "  ".repeat(depth + 1))]);
         let mut lines = vec![format!(
             "{indent}\"{name}\": [  // array of {item_type}, {req}"
@@ -225,7 +252,7 @@ fn object_property_lines(
 
     if !obj.properties.is_empty() {
         let mut lines = vec![format!("{indent}\"{name}\": {{")];
-        lines.extend(render_properties_lines(obj, depth + 1, spec, multi_use));
+        lines.extend(render_properties_lines(obj, depth + 1, ctx));
         lines.push(format!("{indent}}}{trail}"));
         return lines;
     }
@@ -237,23 +264,37 @@ fn object_property_lines(
     )]
 }
 
-fn array_item_lines(
-    items: &Schema,
-    depth: usize,
-    spec: &OpenApiV3Spec,
-    multi_use: &HashSet<String>,
-) -> Vec<String> {
+fn array_item_lines(items: &Schema, depth: usize, ctx: &mut RenderCtx<'_>) -> Vec<String> {
     let indent = "  ".repeat(depth);
 
     if let Some(ref_name) = schema_ref_name(items)
-        && multi_use.contains(ref_name)
+        && (ctx.multi_use.contains(ref_name) || ctx.visiting.contains(ref_name))
     {
         let slug = camel_to_kebab(ref_name);
         let link = format!("../../schemas/{slug}.md");
         return vec![format!("{indent}{{ /* [{ref_name}]({link}) */ }}")];
     }
 
-    let resolved = match items.resolve(spec) {
+    let pushed = schema_ref_name(items).map(|n| n.to_string());
+    if let Some(n) = &pushed {
+        ctx.visiting.insert(n.clone());
+    }
+
+    let lines = resolved_array_item_lines(items, depth, ctx, &indent);
+
+    if let Some(n) = &pushed {
+        ctx.visiting.remove(n);
+    }
+    lines
+}
+
+fn resolved_array_item_lines(
+    items: &Schema,
+    depth: usize,
+    ctx: &mut RenderCtx<'_>,
+    indent: &str,
+) -> Vec<String> {
+    let resolved = match items.resolve(ctx.spec) {
         Ok(s) => s,
         Err(_) => return vec![format!("{indent}null")],
     };
@@ -263,7 +304,7 @@ fn array_item_lines(
         Schema::Object(oor) => match oor.as_ref() {
             ObjectOrReference::Object(obj) if !obj.properties.is_empty() => {
                 let mut lines = vec![format!("{indent}{{")];
-                lines.extend(render_properties_lines(obj, depth + 1, spec, multi_use));
+                lines.extend(render_properties_lines(obj, depth + 1, ctx));
                 lines.push(format!("{indent}}}"));
                 lines
             }
