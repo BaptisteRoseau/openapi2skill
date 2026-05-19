@@ -6,7 +6,7 @@ Built in Rust. Runs in milliseconds. Works on any spec reachable by file path or
 
 ## Overview
 
-`openapi2skill` parses an OpenAPI 3.x spec and writes a structured set of markdown files that Claude Code can use as a [Skill](https://docs.claude.ai/en/docs/claude-code/skills). The output is designed for AI agents, not humans:
+`openapi2skill` parses an OpenAPI 3.x spec and writes a structured set of markdown files that Claude Code can use as a Skill. The output is designed for AI agents, not humans:
 
 - **Token-efficient** — each category and schema has its own file; agents load only what they need.
 - **Index-driven** — every directory has an `index.md` with bullet links, so agents can navigate the tree without scanning all files at once.
@@ -32,7 +32,6 @@ Arguments:
 
 Options:
   -o, --output-dir <DIR>   Output directory (default: snake_case API title)
-  -f, --force              Remove existing output directory before writing
   -v, --verbose            Enable verbose logging
   -h, --help               Print help
   -V, --version            Print version
