@@ -6,7 +6,7 @@ echo "Running cargo fmt check..."
 cargo fmt --check || result=1
 
 echo "Running cargo clippy..."
-cargo clippy --lib -p openapi2skill -- -D warnings || result=1
+cargo clippy -- -D warnings || result=1
 
 echo "Running cargo test..."
 cargo test || result=1

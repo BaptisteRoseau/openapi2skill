@@ -1,44 +1,50 @@
-use openapi2skill::writer::openapi2skill;
 use rstest::rstest;
+use std::process::Command;
 
-async fn load_spec(path: &std::path::Path) -> oas3::OpenApiV3Spec {
-    let content = tokio::fs::read_to_string(path).await.unwrap();
-    match path.extension().and_then(|e| e.to_str()) {
-        Some("yaml") | Some("yml") => serde_yaml::from_str(&content).unwrap(),
-        _ => oas3::from_json(&content).unwrap(),
-    }
+fn run_binary(input: &str, output_dir: &std::path::Path) -> std::process::Output {
+    Command::new(env!("CARGO_BIN_EXE_openapi2skill"))
+        .arg(input)
+        .arg("--output-dir")
+        .arg(output_dir)
+        .output()
+        .expect("failed to run openapi2skill binary")
 }
 
 #[rstest]
-#[tokio::test]
-async fn test_spec_writes_successfully(
+#[test]
+fn test_spec_writes_successfully(
     #[files("tests/assets/*.json")]
     #[files("tests/assets/*.yaml")]
     #[files("tests/assets/*.yml")]
     path: std::path::PathBuf,
 ) {
-    let spec = load_spec(&path).await;
     let tmp = tempfile::tempdir().unwrap();
-    openapi2skill(&spec, Some(tmp.path())).await.unwrap();
+    let output = run_binary(path.to_str().unwrap(), tmp.path());
+    assert!(
+        output.status.success(),
+        "{path:?}: binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(
         tmp.path().join("SKILL.md").exists(),
         "{path:?}: missing SKILL.md"
     );
 }
 
-#[tokio::test]
-async fn test_generates_expected_files() {
-    let spec = load_spec(std::path::Path::new("tests/assets/openapi.json")).await;
+#[test]
+fn test_generates_expected_files() {
     let tmp = tempfile::tempdir().unwrap();
-
-    openapi2skill(&spec, Some(tmp.path())).await.unwrap();
+    let output = run_binary("tests/assets/openapi.json", tmp.path());
+    assert!(
+        output.status.success(),
+        "binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
     let p = tmp.path();
 
-    // Root skill file
     assert!(p.join("SKILL.md").exists(), "missing SKILL.md");
 
-    // Endpoint category
     assert!(
         p.join("endpoints/pet/index.md").exists(),
         "missing endpoints/pet/index.md"
@@ -58,7 +64,6 @@ async fn test_generates_expected_files() {
         "missing endpoints/pet/post-pet.md"
     );
 
-    // Schemas
     assert!(
         p.join("schemas/index.md").exists(),
         "missing schemas/index.md"
@@ -71,13 +76,15 @@ async fn test_generates_expected_files() {
     assert!(p.join("schemas/tag.md").exists(), "missing schemas/tag.md");
 }
 
-#[tokio::test]
-async fn test_no_auth_dir_when_no_schemes() {
-    let spec = load_spec(std::path::Path::new("tests/assets/openapi.json")).await;
+#[test]
+fn test_no_auth_dir_when_no_schemes() {
     let tmp = tempfile::tempdir().unwrap();
-
-    openapi2skill(&spec, Some(tmp.path())).await.unwrap();
-
+    let output = run_binary("tests/assets/openapi.json", tmp.path());
+    assert!(
+        output.status.success(),
+        "binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(
         !tmp.path().join("authentication").exists(),
         "authentication dir should not be created when no security schemes are defined"

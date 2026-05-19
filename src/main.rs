@@ -1,5 +1,13 @@
+mod cli;
+mod error;
+mod fetcher;
+mod logging;
+mod writer;
+
 use clap::Parser;
-use openapi2skill::{cli::CliConfig, fetcher::load_oapi, logging, writer::openapi2skill};
+use cli::CliConfig;
+use fetcher::load_oapi;
+use writer::openapi2skill;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
