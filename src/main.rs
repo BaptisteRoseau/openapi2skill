@@ -15,7 +15,7 @@ async fn main() -> Result<(), anyhow::Error> {
     logging::init_logger(config.verbose);
 
     let doc = load_oapi(config.path_or_url.as_str()).await?;
-    openapi2skill(&doc, config.output_dir.as_deref()).await?;
+    openapi2skill(&doc, config.output_dir.as_deref(), config.force).await?;
 
     Ok(())
 }

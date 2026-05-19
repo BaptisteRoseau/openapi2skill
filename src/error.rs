@@ -16,4 +16,7 @@ pub enum O2SError {
 
     #[error("Invalid format '{0}': expected json, yaml, or yml")]
     InvalidFormat(String),
+
+    #[error("Output directory already exists: {0} (use --force to overwrite)")]
+    OutputDirExists(std::path::PathBuf),
 }

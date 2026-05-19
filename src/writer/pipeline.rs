@@ -10,16 +10,27 @@ use oas3::OpenApiV3Spec;
 use tokio::fs;
 use tracing::info;
 
+use crate::error::O2SError;
+
 use super::utils::{CollectWrites, to_snake_case};
 use super::{auth, endpoint, schema, skill};
 
 pub async fn openapi2skill(
     spec: &OpenApiV3Spec,
     output_dir: Option<&Path>,
+    force: bool,
 ) -> Result<(), anyhow::Error> {
     let dir: PathBuf = output_dir
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from(to_snake_case(&spec.info.title)));
+
+    if dir.exists() {
+        if force {
+            fs::remove_dir_all(&dir).await?;
+        } else {
+            return Err(O2SError::OutputDirExists(dir).into());
+        }
+    }
 
     let mut writes: Vec<(PathBuf, String)> = Vec::new();
 
