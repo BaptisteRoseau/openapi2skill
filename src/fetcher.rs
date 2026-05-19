@@ -111,3 +111,113 @@ fn normalize_type_value(v: &Value) -> Option<Value> {
         other => Some(other.clone()),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    // --- url_extension ---
+
+    #[test]
+    fn url_extension_json() {
+        assert_eq!(url_extension("https://example.com/spec.json"), "json");
+    }
+
+    #[test]
+    fn url_extension_yaml() {
+        assert_eq!(url_extension("https://example.com/api.yaml"), "yaml");
+    }
+
+    #[test]
+    fn url_extension_strips_query_string() {
+        assert_eq!(
+            url_extension("https://example.com/spec.json?version=2"),
+            "json"
+        );
+    }
+
+    #[test]
+    fn url_extension_empty_when_no_dot() {
+        assert_eq!(url_extension("https://example.com/spec"), "");
+    }
+
+    #[test]
+    fn url_extension_lowercases() {
+        assert_eq!(url_extension("https://example.com/spec.JSON"), "json");
+    }
+
+    // --- normalize_type_value ---
+
+    #[test]
+    fn normalize_any_returns_none() {
+        assert_eq!(normalize_type_value(&json!("any")), None);
+    }
+
+    #[test]
+    fn normalize_valid_string_passthrough() {
+        assert_eq!(
+            normalize_type_value(&json!("string")),
+            Some(json!("string"))
+        );
+    }
+
+    #[test]
+    fn normalize_array_picks_non_null() {
+        assert_eq!(
+            normalize_type_value(&json!(["string", "null"])),
+            Some(json!("string"))
+        );
+    }
+
+    #[test]
+    fn normalize_array_picks_first_non_null_non_any() {
+        assert_eq!(
+            normalize_type_value(&json!(["null", "any", "integer"])),
+            Some(json!("integer"))
+        );
+    }
+
+    #[test]
+    fn normalize_array_all_null_returns_none() {
+        assert_eq!(normalize_type_value(&json!(["null"])), None);
+    }
+
+    #[test]
+    fn normalize_array_null_and_any_returns_none() {
+        assert_eq!(normalize_type_value(&json!(["null", "any"])), None);
+    }
+
+    // --- sanitize_invalid_types ---
+
+    #[test]
+    fn sanitize_drops_any_type() {
+        let input = json!({"type": "any", "description": "x"});
+        let out = sanitize_invalid_types(input);
+        assert!(out.get("type").is_none());
+        assert_eq!(out.get("description"), Some(&json!("x")));
+    }
+
+    #[test]
+    fn sanitize_normalizes_type_array() {
+        let input = json!({"type": ["string", "null"]});
+        let out = sanitize_invalid_types(input);
+        assert_eq!(out.get("type"), Some(&json!("string")));
+    }
+
+    #[test]
+    fn sanitize_recurses_into_nested_objects() {
+        let input = json!({"properties": {"name": {"type": "any"}}});
+        let out = sanitize_invalid_types(input);
+        let name = &out["properties"]["name"];
+        assert!(name.get("type").is_none());
+    }
+
+    #[test]
+    fn sanitize_recurses_into_arrays() {
+        let input = json!([{"type": "any"}, {"type": "string"}]);
+        let out = sanitize_invalid_types(input);
+        assert!(out[0].get("type").is_none());
+        assert_eq!(out[1].get("type"), Some(&json!("string")));
+    }
+}

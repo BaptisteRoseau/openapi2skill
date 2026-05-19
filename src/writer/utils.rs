@@ -100,3 +100,148 @@ pub(crate) fn build_index(links: &[(String, String)]) -> String {
         .join("\n")
         + "\n"
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use oas3::spec::{SchemaType, SchemaTypeSet};
+
+    // --- to_snake_case ---
+
+    #[test]
+    fn snake_case_lowercases() {
+        assert_eq!(to_snake_case("PetStore"), "petstore");
+    }
+
+    #[test]
+    fn snake_case_replaces_spaces_with_underscore() {
+        assert_eq!(to_snake_case("foo bar"), "foo_bar");
+    }
+
+    #[test]
+    fn snake_case_deduplicates_underscores() {
+        assert_eq!(to_snake_case("foo--bar"), "foo_bar");
+    }
+
+    #[test]
+    fn snake_case_trims_leading_and_trailing() {
+        assert_eq!(to_snake_case("-foo-"), "foo");
+    }
+
+    #[test]
+    fn snake_case_empty_string() {
+        assert_eq!(to_snake_case(""), "");
+    }
+
+    // --- camel_to_kebab ---
+
+    #[test]
+    fn camel_to_kebab_pascal_case() {
+        assert_eq!(
+            camel_to_kebab("AddDataSourceCommand"),
+            "add-data-source-command"
+        );
+    }
+
+    #[test]
+    fn camel_to_kebab_already_lowercase_passthrough() {
+        assert_eq!(camel_to_kebab("simple"), "simple");
+    }
+
+    #[test]
+    fn camel_to_kebab_single_uppercase_char() {
+        assert_eq!(camel_to_kebab("A"), "a");
+    }
+
+    #[test]
+    fn camel_to_kebab_consecutive_uppercase() {
+        assert_eq!(camel_to_kebab("MyDTO"), "my-d-t-o");
+    }
+
+    // --- path_to_slug ---
+
+    #[test]
+    fn path_to_slug_basic() {
+        assert_eq!(path_to_slug("/pet"), "pet");
+    }
+
+    #[test]
+    fn path_to_slug_nested() {
+        assert_eq!(path_to_slug("/pet/findByStatus"), "pet-find-by-status");
+    }
+
+    #[test]
+    fn path_to_slug_with_path_param() {
+        assert_eq!(path_to_slug("/pet/{petId}"), "pet-pet-id");
+    }
+
+    #[test]
+    fn path_to_slug_root_is_empty() {
+        assert_eq!(path_to_slug("/"), "");
+    }
+
+    // --- category_label ---
+
+    #[test]
+    fn category_label_single_word() {
+        assert_eq!(category_label("pet"), "Pet endpoints");
+    }
+
+    #[test]
+    fn category_label_underscore_becomes_space() {
+        assert_eq!(category_label("admin_users"), "Admin users endpoints");
+    }
+
+    #[test]
+    fn category_label_empty_slug() {
+        assert_eq!(category_label(""), " endpoints");
+    }
+
+    // --- build_index ---
+
+    #[test]
+    fn build_index_produces_bullet_list() {
+        let links = vec![
+            ("pet.md".to_string(), "Pet".to_string()),
+            ("tag.md".to_string(), "Tag".to_string()),
+        ];
+        assert_eq!(
+            build_index(&links),
+            "- [Pet](./pet.md)\n- [Tag](./tag.md)\n"
+        );
+    }
+
+    #[test]
+    fn build_index_empty_is_just_newline() {
+        assert_eq!(build_index(&[]), "\n");
+    }
+
+    // --- primary_type ---
+
+    #[test]
+    fn primary_type_single() {
+        assert_eq!(
+            primary_type(&SchemaTypeSet::Single(SchemaType::Integer)),
+            SchemaType::Integer
+        );
+    }
+
+    #[test]
+    fn primary_type_multiple_picks_non_null() {
+        assert_eq!(
+            primary_type(&SchemaTypeSet::Multiple(vec![
+                SchemaType::Null,
+                SchemaType::String
+            ])),
+            SchemaType::String
+        );
+    }
+
+    #[test]
+    fn primary_type_all_null_falls_back_to_object() {
+        assert_eq!(
+            primary_type(&SchemaTypeSet::Multiple(vec![SchemaType::Null])),
+            SchemaType::Object
+        );
+    }
+}
