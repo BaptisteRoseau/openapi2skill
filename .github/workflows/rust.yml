@@ -4,6 +4,8 @@ name: Rust
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
   pull_request:
     branches: [ "main" ]
 
@@ -13,21 +15,89 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        BUILD_TARGET: [release]
     steps:
       - uses: actions/checkout@v6
-      - name: Run cargo clippy
-        run: cargo clippy --profile ${{ matrix.BUILD_TARGET }}
+      - name: Cache cargo dependencies
+        uses: Swatinem/rust-cache@v2
       - name: Run cargo fmt
         run: cargo fmt --check
-      - name: Build binaries in "${{ matrix.BUILD_TARGET }}" mode
-        run: cargo build --profile ${{ matrix.BUILD_TARGET }}
-      - name: Run tests in "${{ matrix.BUILD_TARGET }}" mode
-        run: cargo test --profile ${{ matrix.BUILD_TARGET }}
-      - name: Upload release artifact
+      - name: Run cargo clippy
+        run: cargo clippy
+      - name: Build
+        run: cargo build
+      - name: Run tests
+        run: cargo test
+
+  build-release:
+    runs-on: ${{ matrix.runner }}
+    if: startsWith(github.ref, 'refs/tags/')
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            artifact: openapi2skill-linux-arm64
+            ext: ""
+            use_cross: true
+          - runner: macos-13
+            target: x86_64-apple-darwin
+            artifact: openapi2skill-macos-amd64
+            ext: ""
+            use_cross: false
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            artifact: openapi2skill-macos-arm64
+            ext: ""
+            use_cross: false
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: openapi2skill-windows-amd64
+            ext: .exe
+            use_cross: false
+    steps:
+      - uses: actions/checkout@v6
+      - name: Cache cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.target }}
+      - name: Install cross
+        if: matrix.use_cross == true
+        run: cargo install cross
+      - name: Add Rust target
+        run: rustup target add ${{ matrix.target }}
+      - name: Run cargo fmt
+        run: cargo fmt --check
+      - name: Run cargo clippy
+        run: cargo clippy --profile release
+      - name: Build
+        run: ${{ matrix.use_cross && 'cross' || 'cargo' }} build --profile release --target ${{ matrix.target }}
+      - name: Run tests
+        if: matrix.use_cross == false
+        run: cargo test --profile release --target ${{ matrix.target }}
+      - name: Prepare artifact
+        shell: bash
+        run: cp target/${{ matrix.target }}/release/openapi2skill${{ matrix.ext }} ${{ matrix.artifact }}${{ matrix.ext }}
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: openapi2skill
-          path: target/${{ matrix.BUILD_TARGET }}/openapi2skill
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}${{ matrix.ext }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build, build-release]
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+      - name: Make binaries executable
+        run: chmod +x dist/openapi2skill-linux-* dist/openapi2skill-macos-*
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/openapi2skill-*
