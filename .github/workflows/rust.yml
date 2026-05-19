@@ -40,10 +40,10 @@ jobs:
             ext: ""
             use_cross: true
           - runner: ubuntu-latest
-            target: amd64-unknown-linux-gnu
+            target: x86_64-unknown-linux-musl
             artifact: openapi2skill-linux-amd64
             ext: ""
-            use_cross: false
+            use_cross: true
           - runner: macos-14
             target: aarch64-apple-darwin
             artifact: openapi2skill-macos-arm64
