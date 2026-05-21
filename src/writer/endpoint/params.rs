@@ -1,9 +1,8 @@
 use oas3::{
     OpenApiV3Spec,
-    spec::{ObjectOrReference, ObjectSchema, Parameter, Schema, SchemaType},
+    spec::{ObjectOrReference, ObjectSchema, Parameter, Schema, SchemaType, SchemaTypeSet},
 };
-
-use crate::writer::utils::primary_type;
+use tracing::warn;
 
 pub(super) fn render_path_params_table(params: &[&Parameter], spec: &OpenApiV3Spec) -> String {
     if params.is_empty() {
@@ -56,7 +55,10 @@ fn render_param_type(schema: &Option<Schema>, spec: &OpenApiV3Spec) -> String {
     };
     let resolved = match schema.resolve(spec) {
         Ok(r) => r,
-        Err(_) => return "unknown".to_string(),
+        Err(err) => {
+            warn!("could not resolve parameter schema: {err}; rendering type as \"unknown\"");
+            return "unknown".to_string();
+        }
     };
     match resolved {
         Schema::Boolean(_) => "boolean".to_string(),
@@ -71,8 +73,7 @@ fn render_param_type(schema: &Option<Schema>, spec: &OpenApiV3Spec) -> String {
 }
 
 fn render_param_object_type(obj: &ObjectSchema) -> String {
-    let ty = obj.schema_type.as_ref().map(primary_type);
-    let mut base = param_base_type(ty, obj.format.as_deref());
+    let mut base = param_base_type(obj.schema_type.as_ref(), obj.format.as_deref());
     let constraints = param_constraints(obj);
     if !constraints.is_empty() {
         base = format!("{base} ({})", constraints.join(", "));
@@ -90,22 +91,41 @@ fn render_param_object_type(obj: &ObjectSchema) -> String {
     format!("{base} ({vals})")
 }
 
-fn param_base_type(ty: Option<SchemaType>, fmt: Option<&str>) -> String {
-    match ty {
+fn param_base_type(ts: Option<&SchemaTypeSet>, fmt: Option<&str>) -> String {
+    match ts {
         None => "any".to_string(),
-        Some(SchemaType::Integer) => fmt
+        Some(SchemaTypeSet::Single(t)) => single_param_type(*t, fmt),
+        Some(SchemaTypeSet::Multiple(types)) => {
+            let inner: Vec<String> = types.iter().copied().map(bare_param_type).collect();
+            format!("array[{}]", inner.join(", "))
+        }
+    }
+}
+
+fn single_param_type(t: SchemaType, fmt: Option<&str>) -> String {
+    match t {
+        SchemaType::Integer => fmt
             .map(|f| format!("integer ({f})"))
             .unwrap_or_else(|| "integer".to_string()),
-        Some(SchemaType::Number) => fmt
+        SchemaType::Number => fmt
             .map(|f| format!("number ({f})"))
             .unwrap_or_else(|| "number".to_string()),
-        Some(SchemaType::String) => fmt
+        SchemaType::String => fmt
             .map(|f| format!("string ({f})"))
             .unwrap_or_else(|| "string".to_string()),
-        Some(SchemaType::Boolean) => "boolean".to_string(),
-        Some(SchemaType::Array) => "array".to_string(),
-        Some(SchemaType::Object) => "object".to_string(),
-        Some(SchemaType::Null) => "null".to_string(),
+        _ => bare_param_type(t),
+    }
+}
+
+fn bare_param_type(t: SchemaType) -> String {
+    match t {
+        SchemaType::Integer => "integer".to_string(),
+        SchemaType::Number => "number".to_string(),
+        SchemaType::String => "string".to_string(),
+        SchemaType::Boolean => "boolean".to_string(),
+        SchemaType::Array => "array".to_string(),
+        SchemaType::Object => "object".to_string(),
+        SchemaType::Null => "null".to_string(),
     }
 }
 
@@ -126,7 +146,15 @@ fn param_constraints(obj: &ObjectSchema) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oas3::spec::SchemaType;
+    use oas3::spec::{SchemaType, SchemaTypeSet};
+
+    fn single(t: SchemaType) -> SchemaTypeSet {
+        SchemaTypeSet::Single(t)
+    }
+
+    fn multi(types: Vec<SchemaType>) -> SchemaTypeSet {
+        SchemaTypeSet::Multiple(types)
+    }
 
     #[test]
     fn param_base_type_none_returns_any() {
@@ -135,26 +163,32 @@ mod tests {
 
     #[test]
     fn param_base_type_integer_no_format() {
-        assert_eq!(param_base_type(Some(SchemaType::Integer), None), "integer");
+        assert_eq!(
+            param_base_type(Some(&single(SchemaType::Integer)), None),
+            "integer"
+        );
     }
 
     #[test]
     fn param_base_type_integer_with_format() {
         assert_eq!(
-            param_base_type(Some(SchemaType::Integer), Some("int64")),
+            param_base_type(Some(&single(SchemaType::Integer)), Some("int64")),
             "integer (int64)"
         );
     }
 
     #[test]
     fn param_base_type_string_no_format() {
-        assert_eq!(param_base_type(Some(SchemaType::String), None), "string");
+        assert_eq!(
+            param_base_type(Some(&single(SchemaType::String)), None),
+            "string"
+        );
     }
 
     #[test]
     fn param_base_type_string_with_format() {
         assert_eq!(
-            param_base_type(Some(SchemaType::String), Some("date-time")),
+            param_base_type(Some(&single(SchemaType::String)), Some("date-time")),
             "string (date-time)"
         );
     }
@@ -162,29 +196,74 @@ mod tests {
     #[test]
     fn param_base_type_number_with_format() {
         assert_eq!(
-            param_base_type(Some(SchemaType::Number), Some("float")),
+            param_base_type(Some(&single(SchemaType::Number)), Some("float")),
             "number (float)"
         );
     }
 
     #[test]
     fn param_base_type_boolean() {
-        assert_eq!(param_base_type(Some(SchemaType::Boolean), None), "boolean");
+        assert_eq!(
+            param_base_type(Some(&single(SchemaType::Boolean)), None),
+            "boolean"
+        );
     }
 
     #[test]
     fn param_base_type_array() {
-        assert_eq!(param_base_type(Some(SchemaType::Array), None), "array");
+        assert_eq!(
+            param_base_type(Some(&single(SchemaType::Array)), None),
+            "array"
+        );
     }
 
     #[test]
     fn param_base_type_object() {
-        assert_eq!(param_base_type(Some(SchemaType::Object), None), "object");
+        assert_eq!(
+            param_base_type(Some(&single(SchemaType::Object)), None),
+            "object"
+        );
     }
 
     #[test]
     fn param_base_type_null() {
-        assert_eq!(param_base_type(Some(SchemaType::Null), None), "null");
+        assert_eq!(
+            param_base_type(Some(&single(SchemaType::Null)), None),
+            "null"
+        );
+    }
+
+    #[test]
+    fn param_base_type_multi_string_null() {
+        assert_eq!(
+            param_base_type(
+                Some(&multi(vec![SchemaType::String, SchemaType::Null])),
+                None
+            ),
+            "array[string, null]"
+        );
+    }
+
+    #[test]
+    fn param_base_type_multi_object_null() {
+        assert_eq!(
+            param_base_type(
+                Some(&multi(vec![SchemaType::Object, SchemaType::Null])),
+                None
+            ),
+            "array[object, null]"
+        );
+    }
+
+    #[test]
+    fn param_base_type_multi_preserves_order() {
+        assert_eq!(
+            param_base_type(
+                Some(&multi(vec![SchemaType::Null, SchemaType::Integer])),
+                None
+            ),
+            "array[null, integer]"
+        );
     }
 
     #[test]

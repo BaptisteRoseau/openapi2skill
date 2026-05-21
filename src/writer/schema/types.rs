@@ -1,4 +1,4 @@
-use oas3::spec::{ObjectSchema, SchemaType};
+use oas3::spec::{ObjectSchema, SchemaType, SchemaTypeSet};
 
 use crate::writer::utils::primary_type;
 
@@ -38,17 +38,17 @@ pub(super) fn primitive_example(obj: &ObjectSchema) -> String {
 }
 
 pub(super) fn type_comment(obj: &ObjectSchema, req: &str) -> String {
-    let ty = obj.schema_type.as_ref().map(primary_type);
+    let ts = obj.schema_type.as_ref();
     let fmt = obj.format.as_deref();
-    let mut parts = vec![type_base_name(ty, fmt)];
+    let mut parts = vec![type_label(ts, fmt)];
+    let is_single_integer = matches!(ts, Some(SchemaTypeSet::Single(SchemaType::Integer)));
     if let Some(f) = fmt
-        && !matches!(ty, Some(SchemaType::Integer))
+        && !is_single_integer
     {
         parts.push(format!("format: {f}"));
     }
-    parts.push(req.to_string());
-    if let Some(desc) = &obj.description {
-        parts.push(desc.trim().to_string());
+    if !req.is_empty() {
+        parts.push(req.to_string());
     }
     parts.extend(collect_type_constraints(obj));
     if !obj.enum_values.is_empty() {
@@ -60,21 +60,45 @@ pub(super) fn type_comment(obj: &ObjectSchema, req: &str) -> String {
             .join(", ");
         parts.push(format!("enum: {vals}"));
     }
+    // Always put description at the end of the line
+    if let Some(desc) = &obj.description {
+        let trimmed = desc.trim();
+        if !trimmed.is_empty() {
+            parts.push(trimmed.to_string());
+        }
+    }
     parts.join(", ")
 }
 
-fn type_base_name(ty: Option<SchemaType>, fmt: Option<&str>) -> String {
-    match ty {
-        Some(SchemaType::Integer) => fmt
+fn type_label(ts: Option<&SchemaTypeSet>, fmt: Option<&str>) -> String {
+    match ts {
+        None => "any".to_string(),
+        Some(SchemaTypeSet::Single(t)) => single_type_label(*t, fmt),
+        Some(SchemaTypeSet::Multiple(types)) => {
+            let inner: Vec<String> = types.iter().copied().map(bare_type_name).collect();
+            format!("array[{}]", inner.join(", "))
+        }
+    }
+}
+
+fn single_type_label(t: SchemaType, fmt: Option<&str>) -> String {
+    match t {
+        SchemaType::Integer => fmt
             .map(|f| format!("integer ({f})"))
             .unwrap_or_else(|| "integer".to_string()),
-        Some(SchemaType::Number) => "number".to_string(),
-        Some(SchemaType::Boolean) => "boolean".to_string(),
-        Some(SchemaType::String) => "string".to_string(),
-        Some(SchemaType::Array) => "array".to_string(),
-        Some(SchemaType::Object) => "object".to_string(),
-        Some(SchemaType::Null) => "null".to_string(),
-        None => "any".to_string(),
+        _ => bare_type_name(t),
+    }
+}
+
+fn bare_type_name(t: SchemaType) -> String {
+    match t {
+        SchemaType::Integer => "integer".to_string(),
+        SchemaType::Number => "number".to_string(),
+        SchemaType::Boolean => "boolean".to_string(),
+        SchemaType::String => "string".to_string(),
+        SchemaType::Array => "array".to_string(),
+        SchemaType::Object => "object".to_string(),
+        SchemaType::Null => "null".to_string(),
     }
 }
 
@@ -268,5 +292,57 @@ mod tests {
         let c = type_comment(&o, "optional");
         assert!(c.contains("min: 1"));
         assert!(c.contains("max: 10"));
+    }
+
+    // --- multi-type (OpenAPI 3.1 type arrays) rendering ---
+
+    #[test]
+    fn type_comment_nullable_string_renders_as_array() {
+        let o = obj(json!({"type": ["string", "null"]}));
+        assert_eq!(
+            type_comment(&o, "optional"),
+            "array[string, null], optional"
+        );
+    }
+
+    #[test]
+    fn type_comment_nullable_object_renders_as_array() {
+        let o = obj(json!({"type": ["object", "null"]}));
+        assert_eq!(
+            type_comment(&o, "required"),
+            "array[object, null], required"
+        );
+    }
+
+    #[test]
+    fn type_comment_preserves_array_order() {
+        let o = obj(json!({"type": ["null", "integer"]}));
+        assert_eq!(
+            type_comment(&o, "optional"),
+            "array[null, integer], optional"
+        );
+    }
+
+    #[test]
+    fn type_comment_multi_type_with_format() {
+        let o = obj(json!({"type": ["string", "null"], "format": "date-time"}));
+        // Format is emitted as a separate part for multi-types — never inlined.
+        assert_eq!(
+            type_comment(&o, "optional"),
+            "array[string, null], format: date-time, optional"
+        );
+    }
+
+    #[test]
+    fn type_comment_multi_type_with_description_and_enum() {
+        let o = obj(json!({
+            "type": ["string", "null"],
+            "enum": ["a", "b"],
+            "description": "Nullable enum",
+        }));
+        let c = type_comment(&o, "optional");
+        assert!(c.starts_with("array[string, null], optional"));
+        assert!(c.contains("enum: \"a\", \"b\""));
+        assert!(c.ends_with("Nullable enum"));
     }
 }

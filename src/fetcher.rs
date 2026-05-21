@@ -59,11 +59,15 @@ fn parse_unknown(content: &str) -> Option<Value> {
         .or_else(|| serde_yaml::from_str(content).ok())
 }
 
-/// Normalize schema `type` fields so the `oas3` crate (OpenAPI 3.0 semantics) can
-/// parse OpenAPI 3.1 specs and minor non-compliances:
+/// Normalize schema `type` fields for minor spec non-compliances. OpenAPI 3.1
+/// type arrays (e.g. `["string", "null"]`) pass through unchanged — `oas3`'s
+/// `TypeSet::Multiple` represents them natively and the renderer formats them
+/// as `array[type, …]`.
+///
+/// What this strips:
 /// - `"type": "any"` → drop the field (not a valid type in any spec version).
-/// - `"type": ["string", "null"]` (3.1 nullable form) → `"type": "string"`. Picks
-///   the first non-null/non-"any" string; drops the field if none qualify.
+/// - `"any"` entries inside a `"type"` array → filtered out; whole field
+///   dropped if no entries remain.
 fn sanitize_invalid_types(value: Value) -> Value {
     match value {
         Value::Object(map) => {
@@ -91,20 +95,19 @@ fn normalize_type_value(v: &Value) -> Option<Value> {
             None
         }
         Value::Array(arr) => {
-            let picked = arr.iter().find_map(|item| match item {
-                Value::String(s) if s != "null" && s != "any" => Some(s.clone()),
-                _ => None,
-            });
-            match picked {
-                Some(t) => {
-                    warn!("Normalizing OpenAPI 3.1 type array {arr:?} → \"{t}\"");
-                    Some(Value::String(t))
-                }
-                None => {
-                    warn!("Dropping schema type array with no usable type: {arr:?}");
-                    None
-                }
+            let kept: Vec<Value> = arr
+                .iter()
+                .filter(|item| matches!(item, Value::String(s) if s != "any"))
+                .cloned()
+                .collect();
+            if kept.len() != arr.len() {
+                warn!("Stripping invalid entries from schema type array: {arr:?} → {kept:?}");
             }
+            if kept.is_empty() {
+                warn!("Dropping schema type array with no usable type: {arr:?}");
+                return None;
+            }
+            Some(Value::Array(kept))
         }
         // Pass through valid string types, sub-schemas under a property literally
         // named "type", etc.
@@ -163,29 +166,46 @@ mod tests {
     }
 
     #[test]
-    fn normalize_array_picks_non_null() {
+    fn normalize_array_preserves_nullable_string() {
         assert_eq!(
             normalize_type_value(&json!(["string", "null"])),
-            Some(json!("string"))
+            Some(json!(["string", "null"]))
         );
     }
 
     #[test]
-    fn normalize_array_picks_first_non_null_non_any() {
+    fn normalize_array_preserves_ordering() {
+        assert_eq!(
+            normalize_type_value(&json!(["null", "integer"])),
+            Some(json!(["null", "integer"]))
+        );
+    }
+
+    #[test]
+    fn normalize_array_filters_any_keeps_rest() {
         assert_eq!(
             normalize_type_value(&json!(["null", "any", "integer"])),
-            Some(json!("integer"))
+            Some(json!(["null", "integer"]))
         );
     }
 
     #[test]
-    fn normalize_array_all_null_returns_none() {
-        assert_eq!(normalize_type_value(&json!(["null"])), None);
+    fn normalize_array_only_null_passes_through() {
+        // A schema saying "this value is always null" is valid in 3.1.
+        assert_eq!(
+            normalize_type_value(&json!(["null"])),
+            Some(json!(["null"]))
+        );
     }
 
     #[test]
-    fn normalize_array_null_and_any_returns_none() {
-        assert_eq!(normalize_type_value(&json!(["null", "any"])), None);
+    fn normalize_array_only_any_returns_none() {
+        assert_eq!(normalize_type_value(&json!(["any"])), None);
+    }
+
+    #[test]
+    fn normalize_array_only_any_and_nothing_else_returns_none() {
+        assert_eq!(normalize_type_value(&json!(["any", "any"])), None);
     }
 
     // --- sanitize_invalid_types ---
@@ -199,10 +219,10 @@ mod tests {
     }
 
     #[test]
-    fn sanitize_normalizes_type_array() {
+    fn sanitize_preserves_type_array() {
         let input = json!({"type": ["string", "null"]});
         let out = sanitize_invalid_types(input);
-        assert_eq!(out.get("type"), Some(&json!("string")));
+        assert_eq!(out.get("type"), Some(&json!(["string", "null"])));
     }
 
     #[test]

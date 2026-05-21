@@ -1,4 +1,5 @@
 use oas3::{OpenApiV3Spec, spec::Operation};
+use tracing::warn;
 
 pub(super) fn render_info_table(
     path: &str,
@@ -28,7 +29,17 @@ fn render_content_type(method: &str, op: &Operation, spec: &OpenApiV3Spec) -> Op
     if !matches!(method, "POST" | "PUT" | "PATCH") {
         return None;
     }
-    let body = op.request_body.as_ref()?.resolve(spec).ok()?;
+    let body_ref = op.request_body.as_ref()?;
+    let body = match body_ref.resolve(spec) {
+        Ok(b) => b,
+        Err(err) => {
+            warn!(
+                operation_id = ?op.operation_id,
+                "could not resolve request body for content-type detection: {err}; omitting Request Content-Type row"
+            );
+            return None;
+        }
+    };
     if body.content.is_empty() {
         return None;
     }

@@ -1,6 +1,6 @@
 [package]
 name = "openapi2skill"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 description = "Convert an OpenAPI 3.x specification into an AI Agent Skill — a tree of markdown files an AI agent can navigate efficiently."
 license = "MIT"

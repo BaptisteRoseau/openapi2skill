@@ -25,16 +25,19 @@ cargo install openapi2skill
 ## Usage
 
 ```
-openapi2skill <path-or-url> [OPTIONS]
+Convert an OpenAPI 3.x specification into an AI Agent Skill — a tree of markdown files an AI agent can navigate efficiently.
+
+Usage: openapi2skill [OPTIONS] <PATH_OR_URL>
 
 Arguments:
-  <path-or-url>   OpenAPI source — file path (.json / .yaml / .yml) or HTTP(S) URL
+  <PATH_OR_URL>  Open API source (URL or file path)
 
 Options:
-  -o, --output-dir <DIR>   Output directory (default: snake_case API title)
-  -v, --verbose            Enable verbose logging
-  -h, --help               Print help
-  -V, --version            Print version
+  -o, --output-dir <OUTPUT_DIR>  Output directory
+  -v, --verbose                  Enable output
+  -f, --force                    Remove existing output directory
+  -h, --help                     Print help
+  -V, --version                  Print version
 ```
 
 **Examples:**
@@ -48,6 +51,9 @@ openapi2skill https://petstore3.swagger.io/api/v3/openapi.json
 
 # Custom output directory
 openapi2skill petstore.yaml --output-dir my_skill
+
+# Make it directly available to Claude Code
+openapi2skill https://petstore3.swagger.io/api/v3/openapi.json --output-dir .claude/skills/api_petstore --force
 ```
 
 ## Skill architecture
@@ -75,6 +81,10 @@ SKILL.md                         # frontmatter (name, description, allowed-tools
 ```
 
 Each endpoint file includes the HTTP method, URL, auth requirements, path/query parameters, a typed request body example, and typed response examples — all in a compact markdown + jsonc format.
+
+## Trubleshooting
+
+If you encounter a warning or an error, feel free to open an issue in this repository, but always include the openapi.json link or file.
 
 ## License
 

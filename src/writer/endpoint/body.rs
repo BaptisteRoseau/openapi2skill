@@ -4,6 +4,7 @@ use oas3::{
     OpenApiV3Spec,
     spec::{ObjectOrReference, Operation, Response},
 };
+use tracing::warn;
 
 use super::refs::{resolve_response, top_level_ref_name};
 use crate::writer::{schema as schema_writer, utils::camel_to_kebab};
@@ -16,8 +17,15 @@ pub(super) fn render_payload_section(
     let Some(body_ref) = &op.request_body else {
         return String::new();
     };
-    let Ok(body) = body_ref.resolve(spec) else {
-        return String::new();
+    let body = match body_ref.resolve(spec) {
+        Ok(b) => b,
+        Err(err) => {
+            warn!(
+                operation_id = ?op.operation_id,
+                "could not resolve request body: {err}; omitting payload section"
+            );
+            return String::new();
+        }
     };
     let mut out = "### Payload\n\n".to_string();
     let media = body
@@ -53,6 +61,10 @@ fn render_response(
     multi_use: &HashSet<String>,
 ) -> String {
     let Some(resp) = resolve_response(resp_ref, spec) else {
+        warn!(
+            status = code,
+            "could not resolve response; omitting response section"
+        );
         return String::new();
     };
     let mut out = format!("## Response {code}\n\n");

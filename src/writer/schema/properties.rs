@@ -2,8 +2,10 @@ use oas3::{
     OpenApiV3Spec,
     spec::{ObjectOrReference, ObjectSchema, Schema},
 };
+use tracing::warn;
 
 use super::{
+    composition::merge_all_of,
     context::RenderCtx,
     types::{primitive_example, primitive_type_name, type_comment},
 };
@@ -71,7 +73,11 @@ fn resolved_property_lines(
     let req = if is_required { "required" } else { "optional" };
     let resolved = match schema.resolve(ctx.spec) {
         Ok(s) => s,
-        Err(_) => {
+        Err(err) => {
+            warn!(
+                property = name,
+                "could not resolve schema for property: {err}; rendering as null"
+            );
             return vec![format!(
                 "{indent}\"{name}\": null{trail}  // unknown, {req}"
             )];
@@ -87,9 +93,16 @@ fn resolved_property_lines(
             ObjectOrReference::Object(obj) => {
                 object_property_lines(name, obj, is_required, trail, depth, ctx)
             }
-            ObjectOrReference::Ref { .. } => vec![format!(
-                "{indent}\"{name}\": null{trail}  // unresolved ref, {req}"
-            )],
+            ObjectOrReference::Ref { ref_path, .. } => {
+                warn!(
+                    property = name,
+                    ref_path = %ref_path,
+                    "property resolved to an unresolved $ref; rendering as null"
+                );
+                vec![format!(
+                    "{indent}\"{name}\": null{trail}  // unresolved ref, {req}"
+                )]
+            }
         },
     }
 }
@@ -104,15 +117,16 @@ fn object_property_lines(
 ) -> Vec<String> {
     let indent = "  ".repeat(depth);
     let req = if is_required { "required" } else { "optional" };
+    let merged = merge_all_of(obj, ctx);
 
-    if obj
+    if merged
         .schema_type
         .as_ref()
         .map(|ts| ts.is_array_or_nullable_array())
         .unwrap_or(false)
     {
-        let item_type = array_item_type_label(obj, ctx.spec);
-        let item_lines = obj
+        let item_type = array_item_type_label(&merged, ctx.spec);
+        let item_lines = merged
             .items
             .as_ref()
             .map(|items| array_item_lines(items, depth + 1, ctx))
@@ -125,15 +139,15 @@ fn object_property_lines(
         return lines;
     }
 
-    if !obj.properties.is_empty() {
+    if !merged.properties.is_empty() {
         let mut lines = vec![format!("{indent}\"{name}\": {{")];
-        lines.extend(render_properties_lines(obj, depth + 1, ctx));
+        lines.extend(render_properties_lines(&merged, depth + 1, ctx));
         lines.push(format!("{indent}}}{trail}"));
         return lines;
     }
 
-    let example = primitive_example(obj);
-    let comment = type_comment(obj, req);
+    let example = primitive_example(&merged);
+    let comment = type_comment(&merged, req);
     vec![format!(
         "{indent}\"{name}\": {example}{trail}  // {comment}"
     )]
@@ -175,20 +189,32 @@ fn resolved_array_item_lines(
 ) -> Vec<String> {
     let resolved = match items.resolve(ctx.spec) {
         Ok(s) => s,
-        Err(_) => return vec![format!("{indent}null")],
+        Err(err) => {
+            warn!("could not resolve array item schema: {err}; rendering as null");
+            return vec![format!("{indent}null")];
+        }
     };
 
     match resolved {
         Schema::Boolean(b) => vec![format!("{indent}{}", b.0)],
         Schema::Object(oor) => match oor.as_ref() {
-            ObjectOrReference::Object(obj) if !obj.properties.is_empty() => {
+            ObjectOrReference::Object(obj) => {
+                let merged = merge_all_of(obj, ctx);
+                if merged.properties.is_empty() {
+                    return vec![format!("{indent}{}", primitive_example(&merged))];
+                }
                 let mut lines = vec![format!("{indent}{{")];
-                lines.extend(render_properties_lines(obj, depth + 1, ctx));
+                lines.extend(render_properties_lines(&merged, depth + 1, ctx));
                 lines.push(format!("{indent}}}"));
                 lines
             }
-            ObjectOrReference::Object(obj) => vec![format!("{indent}{}", primitive_example(obj))],
-            ObjectOrReference::Ref { .. } => vec![format!("{indent}null")],
+            ObjectOrReference::Ref { ref_path, .. } => {
+                warn!(
+                    ref_path = %ref_path,
+                    "array item resolved to an unresolved $ref; rendering as null"
+                );
+                vec![format!("{indent}null")]
+            }
         },
     }
 }

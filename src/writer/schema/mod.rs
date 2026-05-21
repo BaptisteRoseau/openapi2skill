@@ -1,3 +1,4 @@
+mod composition;
 mod context;
 mod properties;
 mod render;

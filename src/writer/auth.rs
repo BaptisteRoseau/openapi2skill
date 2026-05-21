@@ -39,7 +39,7 @@ use oas3::{
     OpenApiV3Spec,
     spec::{Flows, ObjectOrReference, SecurityScheme},
 };
-use tracing::info;
+use tracing::{info, warn};
 
 use super::utils::{CollectWrites, build_index};
 
@@ -65,7 +65,14 @@ impl CollectWrites for Writer {
         for (name, scheme_ref) in &components.security_schemes {
             let scheme = match scheme_ref {
                 ObjectOrReference::Object(s) => s,
-                ObjectOrReference::Ref { .. } => continue,
+                ObjectOrReference::Ref { ref_path, .. } => {
+                    warn!(
+                        scheme = name,
+                        ref_path = %ref_path,
+                        "security scheme is a $ref; skipping (refs to other schemes are not supported)"
+                    );
+                    continue;
+                }
             };
             let filename = format!("{}.md", name.to_lowercase().replace(' ', "-"));
             let content = render_scheme(name, scheme);

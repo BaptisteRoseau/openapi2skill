@@ -4,6 +4,7 @@ use oas3::{
     OpenApiV3Spec,
     spec::{Operation, ParameterIn},
 };
+use tracing::warn;
 
 use super::{
     body::{render_payload_section, render_responses_section},
@@ -33,7 +34,16 @@ fn render_input_section(
     let params: Vec<_> = op
         .parameters
         .iter()
-        .filter_map(|p| p.resolve(spec).ok())
+        .filter_map(|p| match p.resolve(spec) {
+            Ok(param) => Some(param),
+            Err(err) => {
+                warn!(
+                    operation_id = ?op.operation_id,
+                    "could not resolve parameter: {err}; dropping it from the rendered table"
+                );
+                None
+            }
+        })
         .collect();
     let path_params: Vec<_> = params
         .iter()
