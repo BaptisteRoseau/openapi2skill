@@ -68,16 +68,17 @@ SKILL.md                         # frontmatter (name, description, allowed-tools
 │   ├── api_key.md               # one file per security scheme
 │   └── oauth.md
 │
-├── {tag}/                       # one directory per operation tag (snake_case); "general" if untagged
-│   ├── index.md                 # bullet links to each endpoint file
-│   ├── get-pets.md              # one file per operation: method + path slug
-│   ├── post-pets.md
-│   └── get-pets-pet-id.md
+├── endpoints/                   # one directory per operation tag (snake_case); "general" if untagged
+│   └── {tag}/
+│       ├── index.md             # bullet links to each endpoint file
+│       ├── get-pets.md          # one file per operation: method + path slug
+│       ├── post-pets.md
+│       └── get-pets-pet-id.md
 │
 └── schemas/
     ├── index.md                 # bullet links to each schema file
-    ├── Pet.md                   # one file per component schema
-    └── Error.md
+    ├── pet.md                   # one file per component schema
+    └── error.md
 ```
 
 Each endpoint file includes the HTTP method, URL, auth requirements, path/query parameters, a typed request body example, and typed response examples — all in a compact markdown + jsonc format.
