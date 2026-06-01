@@ -44,6 +44,7 @@ use super::utils::{CollectWrites, category_label, op_category};
 
 pub(super) struct Writer {
     pub(super) name: String,
+    pub(super) servers_override: Vec<String>,
 }
 
 impl CollectWrites for Writer {
@@ -53,18 +54,21 @@ impl CollectWrites for Writer {
         dir: &Path,
         writes: &mut Vec<(PathBuf, String)>,
     ) {
-        let write_path = (dir.join("SKILL.md"), render(spec, &self.name));
+        let write_path = (
+            dir.join("SKILL.md"),
+            render(spec, &self.name, &self.servers_override),
+        );
         info!("Writing {:?}", write_path.0);
         writes.push(write_path);
     }
 }
 
-fn render(spec: &OpenApiV3Spec, name: &str) -> String {
+fn render(spec: &OpenApiV3Spec, name: &str, servers_override: &[String]) -> String {
     let title = &spec.info.title;
     let description = spec.info.description.as_deref().unwrap_or("");
 
     let mut out = render_skill_header(name, title);
-    out.push_str(&render_metadata(spec));
+    out.push_str(&render_metadata(spec, servers_override));
     out.push_str(&render_decription_and_navigation(description));
     out.push_str(&render_index(spec));
     out
@@ -76,7 +80,7 @@ fn render_skill_header(name: &str, title: &str) -> String {
     )
 }
 
-fn render_metadata(spec: &OpenApiV3Spec) -> String {
+fn render_metadata(spec: &OpenApiV3Spec, servers_override: &[String]) -> String {
     let mut out = format!("**Version:** {}", spec.info.version);
 
     if let Some(license) = &spec.info.license {
@@ -91,7 +95,13 @@ fn render_metadata(spec: &OpenApiV3Spec) -> String {
     }
     out.push_str("\n\n");
 
-    if !spec.servers.is_empty() {
+    if !servers_override.is_empty() {
+        out.push_str("**Servers:**\n");
+        for url in servers_override {
+            out.push_str(&format!("- {url}\n"));
+        }
+        out.push('\n');
+    } else if !spec.servers.is_empty() {
         out.push_str("**Servers:**\n");
         for server in &spec.servers {
             if let Some(desc) = &server.description {
@@ -158,4 +168,63 @@ fn render_index(spec: &OpenApiV3Spec) -> String {
         out.push_str("- [schemas/index.md](./schemas/index.md): Data schemas, only if you need them alone. They are already included in endpoints.\n");
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn minimal_spec(server_urls: &[&str]) -> OpenApiV3Spec {
+        let servers_json: String = server_urls
+            .iter()
+            .map(|u| format!(r#"{{"url":"{u}"}}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        let json = format!(
+            r#"{{"openapi":"3.0.0","info":{{"title":"Test API","version":"1.0.0"}},"servers":[{servers_json}],"paths":{{}}}}"#
+        );
+        oas3::from_json(json).unwrap()
+    }
+
+    #[test]
+    fn server_override_replaces_spec_servers() {
+        let spec = minimal_spec(&["https://spec.example.com"]);
+        let overrides = vec![
+            "https://override1.example.com".to_string(),
+            "https://override2.example.com".to_string(),
+        ];
+        let out = render_metadata(&spec, &overrides);
+        assert!(
+            out.contains("https://override1.example.com"),
+            "expected override1 in:\n{out}"
+        );
+        assert!(
+            out.contains("https://override2.example.com"),
+            "expected override2 in:\n{out}"
+        );
+        assert!(
+            !out.contains("https://spec.example.com"),
+            "spec server should be suppressed:\n{out}"
+        );
+    }
+
+    #[test]
+    fn empty_override_falls_back_to_spec_servers() {
+        let spec = minimal_spec(&["https://spec.example.com"]);
+        let out = render_metadata(&spec, &[]);
+        assert!(
+            out.contains("https://spec.example.com"),
+            "expected spec server in:\n{out}"
+        );
+    }
+
+    #[test]
+    fn no_servers_section_when_both_empty() {
+        let spec = minimal_spec(&[]);
+        let out = render_metadata(&spec, &[]);
+        assert!(
+            !out.contains("**Servers:**"),
+            "servers section should be absent:\n{out}"
+        );
+    }
 }

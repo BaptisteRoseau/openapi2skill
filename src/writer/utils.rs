@@ -47,9 +47,10 @@ pub(crate) fn category_label(slug: &str) -> String {
 
 pub(crate) fn infer_skill_name(title: &str, output_dir: Option<&Path>) -> String {
     if let Some(dir) = output_dir
-        && let Some(name) = dir.file_name() {
-            return name.to_string_lossy().into_owned();
-        }
+        && let Some(name) = dir.file_name()
+    {
+        return name.to_string_lossy().into_owned();
+    }
     format!("api-{}", to_dashed_case(title))
 }
 
@@ -194,10 +195,7 @@ mod tests {
 
     #[test]
     fn to_dashed_case_mixed() {
-        assert_eq!(
-            to_dashed_case("My REST API aïé"),
-            "my-rest-api-aie"
-        );
+        assert_eq!(to_dashed_case("My REST API aïé"), "my-rest-api-aie");
     }
 
     #[test]

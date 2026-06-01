@@ -177,6 +177,40 @@ fn test_openapi_3_1_type_arrays_render_as_array_of_types() {
 }
 
 #[test]
+fn test_server_override_appears_in_skill_md() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out");
+    let output = run_binary_with_args(
+        "tests/assets/openapi.json",
+        &out,
+        &[
+            "--server",
+            "override1.example.com",
+            "--server",
+            "https://override2.example.com",
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let skill_md = std::fs::read_to_string(out.join("SKILL.md")).unwrap();
+    assert!(
+        skill_md.contains("https://override1.example.com"),
+        "expected https-prefixed override1 in SKILL.md:\n{skill_md}"
+    );
+    assert!(
+        skill_md.contains("https://override2.example.com"),
+        "expected override2 in SKILL.md:\n{skill_md}"
+    );
+    assert!(
+        !skill_md.contains("https://petstore.swagger.io/v2"),
+        "spec server should be suppressed when --server is given:\n{skill_md}"
+    );
+}
+
+#[test]
 fn test_no_auth_dir_when_no_schemes() {
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("out");
