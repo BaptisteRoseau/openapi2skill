@@ -8,11 +8,11 @@ pub struct CliConfig {
     /// Open API source (URL or file path)
     pub path_or_url: String,
 
-    /// Output directory
+    /// Output directory, also used as the name ok the skill when provided.
     #[arg(short, long)]
     pub output_dir: Option<PathBuf>,
 
-    /// Enable output
+    /// Enable stdout output
     #[arg(short, long, default_value_t = false)]
     pub verbose: bool,
 
