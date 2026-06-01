@@ -36,22 +36,26 @@ jobs:
         include:
           - runner: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            artifact: openapi2skill-linux-arm64
+            archive: openapi2skill-linux-arm64
+            archive_ext: .tar.gz
             ext: ""
             use_cross: true
           - runner: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            artifact: openapi2skill-linux-amd64
+            archive: openapi2skill-linux-amd64
+            archive_ext: .tar.gz
             ext: ""
             use_cross: true
           - runner: macos-14
             target: aarch64-apple-darwin
-            artifact: openapi2skill-macos-arm64
+            archive: openapi2skill-macos-arm64
+            archive_ext: .zip
             ext: ""
             use_cross: false
           - runner: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: openapi2skill-windows-amd64
+            archive: openapi2skill-windows-amd64
+            archive_ext: .zip
             ext: .exe
             use_cross: false
     steps:
@@ -76,12 +80,18 @@ jobs:
         run: cargo test --profile release --target ${{ matrix.target }}
       - name: Prepare artifact
         shell: bash
-        run: cp target/${{ matrix.target }}/release/openapi2skill${{ matrix.ext }} ${{ matrix.artifact }}${{ matrix.ext }}
+        run: |
+          cp target/${{ matrix.target }}/release/openapi2skill${{ matrix.ext }} openapi2skill${{ matrix.ext }}
+          if [[ "${{ matrix.archive_ext }}" == ".tar.gz" ]]; then
+            tar czf ${{ matrix.archive }}.tar.gz openapi2skill
+          else
+            zip ${{ matrix.archive }}.zip openapi2skill${{ matrix.ext }}
+          fi
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}${{ matrix.ext }}
+          name: ${{ matrix.archive }}
+          path: ${{ matrix.archive }}${{ matrix.archive_ext }}
 
   release:
     runs-on: ubuntu-latest
@@ -95,9 +105,9 @@ jobs:
         with:
           path: dist/
           merge-multiple: true
-      - name: Make binaries executable
-        run: chmod +x dist/openapi2skill-linux-* dist/openapi2skill-macos-*
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/openapi2skill-*
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
