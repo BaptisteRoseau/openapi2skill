@@ -83,7 +83,7 @@ SKILL.md                         # frontmatter (name, description, allowed-tools
 
 Each endpoint file includes the HTTP method, URL, auth requirements, path/query parameters, a typed request body example, and typed response examples — all in a compact markdown + jsonc format.
 
-## Trubleshooting
+## Troubleshooting
 
 If you encounter a warning or an error, feel free to open an issue in this repository, but always include the openapi.json link or file.
 
