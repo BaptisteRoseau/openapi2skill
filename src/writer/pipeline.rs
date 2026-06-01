@@ -12,7 +12,7 @@ use tracing::info;
 
 use crate::error::O2SError;
 
-use super::utils::{CollectWrites, to_snake_case};
+use super::utils::{CollectWrites, infer_skill_name};
 use super::{auth, endpoint, schema, skill};
 
 pub async fn openapi2skill(
@@ -20,9 +20,10 @@ pub async fn openapi2skill(
     output_dir: Option<&Path>,
     force: bool,
 ) -> Result<(), anyhow::Error> {
+    let skill_name = infer_skill_name(&spec.info.title, output_dir);
     let dir: PathBuf = output_dir
         .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from(to_snake_case(&spec.info.title)));
+        .unwrap_or_else(|| PathBuf::from(&skill_name));
 
     if dir.exists() {
         if force {
@@ -34,8 +35,9 @@ pub async fn openapi2skill(
 
     let mut writes: Vec<(PathBuf, String)> = Vec::new();
 
+    let skill_writer = skill::Writer { name: skill_name };
     let writers: &[&dyn CollectWrites] = &[
-        &skill::Writer,
+        &skill_writer,
         &auth::Writer,
         &endpoint::Writer,
         &schema::Writer,

@@ -5,7 +5,9 @@
 //! - [`category_label`]: turns a slug like `admin_users` into `"Admin users endpoints"`.
 //! - [`path_to_slug`]: converts `/admin/users/{userId}` to `admin-users-user-id`.
 //! - [`camel_to_kebab`]: converts `AddDataSourceCommand` to `add-data-source-command`.
-//! - [`to_snake_case`]: converts arbitrary strings to `snake_case` (used for output dir name and category slugs).
+//! - [`to_snake_case`]: converts arbitrary strings to `snake_case` (used for category slugs).
+//! - [`to_dashed_case`]: converts arbitrary strings to `kebab-case` ASCII (used for skill name).
+//! - [`infer_skill_name`]: derives the skill name from the output dir or spec title.
 //! - [`primary_type`]: extracts the non-null type from a `SchemaTypeSet`.
 //! - [`build_index`]: builds a markdown bullet list of `[name](./file.md)` links.
 
@@ -41,6 +43,52 @@ pub(crate) fn category_label(slug: &str) -> String {
         Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
     };
     format!("{capitalized} endpoints")
+}
+
+pub(crate) fn infer_skill_name(title: &str, output_dir: Option<&Path>) -> String {
+    if let Some(dir) = output_dir
+        && let Some(name) = dir.file_name() {
+            return name.to_string_lossy().into_owned();
+        }
+    format!("api-{}", to_dashed_case(title))
+}
+
+fn strip_accents(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' | 'À' | 'Á' | 'Â' | 'Ã' | 'Ä' | 'Å' => {
+                'a'
+            }
+            'è' | 'é' | 'ê' | 'ë' | 'È' | 'É' | 'Ê' | 'Ë' => 'e',
+            'ì' | 'í' | 'î' | 'ï' | 'Ì' | 'Í' | 'Î' | 'Ï' => 'i',
+            'ò' | 'ó' | 'ô' | 'õ' | 'ö' | 'ø' | 'Ò' | 'Ó' | 'Ô' | 'Õ' | 'Ö' | 'Ø' => {
+                'o'
+            }
+            'ù' | 'ú' | 'û' | 'ü' | 'Ù' | 'Ú' | 'Û' | 'Ü' => 'u',
+            'ý' | 'ÿ' | 'Ý' => 'y',
+            'ñ' | 'Ñ' => 'n',
+            'ç' | 'Ç' => 'c',
+            'ß' => 's',
+            _ => c,
+        })
+        .collect()
+}
+
+pub(crate) fn to_dashed_case(s: &str) -> String {
+    let s = strip_accents(s);
+    s.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 pub(crate) fn to_snake_case(s: &str) -> String {
@@ -105,6 +153,57 @@ pub(crate) fn build_index(links: &[(String, String)]) -> String {
 mod tests {
     use super::*;
     use oas3::spec::{SchemaType, SchemaTypeSet};
+
+    // --- infer_skill_name ---
+
+    #[test]
+    fn infer_skill_name_no_output_dir() {
+        assert_eq!(
+            infer_skill_name("My REST API aïé", None),
+            "api-my-rest-api-aie"
+        );
+    }
+
+    #[test]
+    fn infer_skill_name_with_output_dir() {
+        assert_eq!(
+            infer_skill_name("Swagger Petstore", Some(Path::new("my-custom-dir"))),
+            "my-custom-dir"
+        );
+    }
+
+    #[test]
+    fn infer_skill_name_output_dir_nested() {
+        assert_eq!(
+            infer_skill_name("Swagger Petstore", Some(Path::new("/some/path/my-api"))),
+            "my-api"
+        );
+    }
+
+    // --- to_dashed_case ---
+
+    #[test]
+    fn to_dashed_case_simple() {
+        assert_eq!(to_dashed_case("Swagger Petstore"), "swagger-petstore");
+    }
+
+    #[test]
+    fn to_dashed_case_accents() {
+        assert_eq!(to_dashed_case("aïé"), "aie");
+    }
+
+    #[test]
+    fn to_dashed_case_mixed() {
+        assert_eq!(
+            to_dashed_case("My REST API aïé"),
+            "my-rest-api-aie"
+        );
+    }
+
+    #[test]
+    fn to_dashed_case_deduplicates_dashes() {
+        assert_eq!(to_dashed_case("foo--bar"), "foo-bar");
+    }
 
     // --- to_snake_case ---
 

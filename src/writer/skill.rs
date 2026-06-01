@@ -42,7 +42,9 @@ use tracing::info;
 
 use super::utils::{CollectWrites, category_label, op_category};
 
-pub(super) struct Writer;
+pub(super) struct Writer {
+    pub(super) name: String,
+}
 
 impl CollectWrites for Writer {
     fn collect_writes(
@@ -51,26 +53,26 @@ impl CollectWrites for Writer {
         dir: &Path,
         writes: &mut Vec<(PathBuf, String)>,
     ) {
-        let write_path = (dir.join("SKILL.md"), render(spec));
+        let write_path = (dir.join("SKILL.md"), render(spec, &self.name));
         info!("Writing {:?}", write_path.0);
         writes.push(write_path);
     }
 }
 
-fn render(spec: &OpenApiV3Spec) -> String {
+fn render(spec: &OpenApiV3Spec, name: &str) -> String {
     let title = &spec.info.title;
     let description = spec.info.description.as_deref().unwrap_or("");
 
-    let mut out = render_skill_header(title);
+    let mut out = render_skill_header(name, title);
     out.push_str(&render_metadata(spec));
     out.push_str(&render_decription_and_navigation(description));
     out.push_str(&render_index(spec));
     out
 }
 
-fn render_skill_header(title: &str) -> String {
+fn render_skill_header(name: &str, title: &str) -> String {
     format!(
-        "---\nname: {title}\ndescription: The API documentation and specifiations of {title}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
+        "---\nname: {name}\ndescription: The API documentation and specifiations of {title}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
     )
 }
 
