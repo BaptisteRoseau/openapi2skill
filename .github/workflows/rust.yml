@@ -78,6 +78,9 @@ jobs:
       - name: Run tests
         if: matrix.use_cross == false
         run: cargo test --profile release --target ${{ matrix.target }}
+      - name: Install zip (Windows)
+        if: runner.os == 'Windows'
+        run: choco install zip -y
       - name: Prepare artifact
         shell: bash
         run: |
