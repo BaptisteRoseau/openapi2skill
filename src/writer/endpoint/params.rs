@@ -48,7 +48,7 @@ pub(super) fn render_query_params_table(params: &[&Parameter], spec: &OpenApiV3S
     out
 }
 
-fn render_param_type(schema: &Option<Schema>, spec: &OpenApiV3Spec) -> String {
+pub(super) fn render_param_type(schema: &Option<Schema>, spec: &OpenApiV3Spec) -> String {
     let schema = match schema {
         None => return "string".to_string(),
         Some(s) => s,

@@ -59,31 +59,87 @@ fn parse_unknown(content: &str) -> Option<Value> {
         .or_else(|| serde_yaml::from_str(content).ok())
 }
 
-/// Normalize schema `type` fields for minor spec non-compliances. OpenAPI 3.1
-/// type arrays (e.g. `["string", "null"]`) pass through unchanged — `oas3`'s
-/// `TypeSet::Multiple` represents them natively and the renderer formats them
-/// as `array[type, …]`.
+/// Normalize spec fields for minor non-compliances encountered in real-world OpenAPI specs.
 ///
-/// What this strips:
-/// - `"type": "any"` → drop the field (not a valid type in any spec version).
-/// - `"any"` entries inside a `"type"` array → filtered out; whole field
-///   dropped if no entries remain.
+/// Runs two passes in one tree walk, tracking whether we are inside a schema object:
+///
+/// - `"type": "any"` → drop (not a valid OpenAPI 3.x type).
+/// - `"any"` inside a `"type"` array → filtered out; field dropped if nothing remains.
+/// - `"required": <bool>` inside a schema body → drop. OpenAPI schemas require `required` to
+///   be a string array; some specs wrongly embed the parameter-level `required` flag inside
+///   the schema object itself (e.g. Spotify's `image/jpeg` upload schema).
 fn sanitize_invalid_types(value: Value) -> Value {
+    sanitize(value, false)
+}
+
+fn sanitize(value: Value, in_schema: bool) -> Value {
     match value {
         Value::Object(map) => {
             let mut out = serde_json::Map::with_capacity(map.len());
             for (k, v) in map {
-                if k == "type" {
-                    if let Some(normalized) = normalize_type_value(&v) {
-                        out.insert(k, normalized);
+                match k.as_str() {
+                    "type" => {
+                        if let Some(normalized) = normalize_type_value(&v) {
+                            out.insert(k, normalized);
+                        }
                     }
-                    continue;
+                    // `required` in a schema body must be Vec<String>; a boolean is invalid.
+                    "required" if in_schema => {
+                        if matches!(v, Value::Bool(_)) {
+                            warn!(
+                                "Dropping boolean `required` inside schema body (not valid in OpenAPI 3.x schemas)"
+                            );
+                        } else {
+                            out.insert(k, sanitize(v, false));
+                        }
+                    }
+                    // These keys always introduce a schema value.
+                    "schema" => {
+                        out.insert(k, sanitize(v, true));
+                    }
+                    // `schemas` under `components` is a map of schema objects.
+                    "schemas" => {
+                        out.insert(k, sanitize_map_values(v, true));
+                    }
+                    // Sub-schema keys that are only meaningful inside a schema object.
+                    "items" | "additionalProperties" | "not" if in_schema => {
+                        out.insert(k, sanitize(v, true));
+                    }
+                    // Each property value is a schema.
+                    "properties" if in_schema => {
+                        out.insert(k, sanitize_map_values(v, true));
+                    }
+                    // Each array item is a schema.
+                    "allOf" | "anyOf" | "oneOf" | "prefixItems" if in_schema => {
+                        let new_v = match v {
+                            Value::Array(arr) => {
+                                Value::Array(arr.into_iter().map(|i| sanitize(i, true)).collect())
+                            }
+                            other => other,
+                        };
+                        out.insert(k, new_v);
+                    }
+                    _ => {
+                        out.insert(k, sanitize(v, in_schema));
+                    }
                 }
-                out.insert(k, sanitize_invalid_types(v));
             }
             Value::Object(out)
         }
-        Value::Array(arr) => Value::Array(arr.into_iter().map(sanitize_invalid_types).collect()),
+        Value::Array(arr) => {
+            Value::Array(arr.into_iter().map(|v| sanitize(v, in_schema)).collect())
+        }
+        other => other,
+    }
+}
+
+fn sanitize_map_values(value: Value, in_schema: bool) -> Value {
+    match value {
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(k, v)| (k, sanitize(v, in_schema)))
+                .collect(),
+        ),
         other => other,
     }
 }

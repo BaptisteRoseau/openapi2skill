@@ -6,6 +6,7 @@ use oas3::{
 };
 use tracing::warn;
 
+use super::headers::render_response_headers_table;
 use super::refs::{resolve_response, top_level_ref_name};
 use crate::writer::{schema as schema_writer, utils::camel_to_kebab};
 
@@ -81,6 +82,7 @@ fn render_response(
         out.push_str(desc);
         out.push_str("\n\n");
     }
+    out.push_str(&render_response_headers_table(&resp.headers, spec));
     out.push_str(&render_response_body(&resp, spec, multi_use));
     out
 }
