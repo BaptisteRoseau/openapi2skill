@@ -1,6 +1,8 @@
 use oas3::{
     OpenApiV3Spec,
-    spec::{ObjectOrReference, ObjectSchema, Parameter, Schema, SchemaType, SchemaTypeSet},
+    spec::{
+        MediaType, ObjectOrReference, ObjectSchema, Parameter, Schema, SchemaType, SchemaTypeSet,
+    },
 };
 use tracing::warn;
 
@@ -18,7 +20,7 @@ pub(super) fn render_path_params_table(params: &[&Parameter], spec: &OpenApiV3Sp
         out.push_str(&format!(
             "| `{}` | {} | {req} | {} |\n",
             p.name,
-            render_param_type(&p.schema, spec),
+            render_param_type(effective_schema(p), spec),
             p.description.as_deref().unwrap_or("-"),
         ));
     }
@@ -40,7 +42,7 @@ pub(super) fn render_query_params_table(params: &[&Parameter], spec: &OpenApiV3S
         out.push_str(&format!(
             "| `{}` | {} | {req} | {} |\n",
             p.name,
-            render_param_type(&p.schema, spec),
+            render_param_type(effective_schema(p), spec),
             p.description.as_deref().unwrap_or("-"),
         ));
     }
@@ -48,7 +50,17 @@ pub(super) fn render_query_params_table(params: &[&Parameter], spec: &OpenApiV3S
     out
 }
 
-pub(super) fn render_param_type(schema: &Option<Schema>, spec: &OpenApiV3Spec) -> String {
+fn effective_schema(p: &Parameter) -> Option<&Schema> {
+    p.schema.as_ref().or_else(|| {
+        p.content
+            .as_ref()?
+            .values()
+            .next()
+            .and_then(|mt: &MediaType| mt.schema.as_ref())
+    })
+}
+
+pub(super) fn render_param_type(schema: Option<&Schema>, spec: &OpenApiV3Spec) -> String {
     let schema = match schema {
         None => return "string".to_string(),
         Some(s) => s,
@@ -306,5 +318,55 @@ mod tests {
         )
         .unwrap();
         assert_eq!(param_constraints(&obj), vec!["0..50", "max_len:8"]);
+    }
+
+    fn empty_spec() -> OpenApiV3Spec {
+        oas3::from_json(r#"{"openapi":"3.1.0","info":{"title":"Test","version":"1.0"},"paths":{}}"#)
+            .unwrap()
+    }
+
+    fn make_param(value: serde_json::Value) -> Parameter {
+        let mut base = serde_json::json!({"name": "p", "in": "query"});
+        if let (Some(obj), Some(extra)) = (base.as_object_mut(), value.as_object()) {
+            for (k, v) in extra {
+                obj.insert(k.clone(), v.clone());
+            }
+        }
+        serde_json::from_value(base).unwrap()
+    }
+
+    #[test]
+    fn effective_schema_prefers_schema_over_content() {
+        let p = make_param(serde_json::json!({
+            "schema": {"type": "integer"},
+            "content": {"application/json": {"schema": {"type": "object"}}}
+        }));
+        let spec = empty_spec();
+        assert_eq!(render_param_type(effective_schema(&p), &spec), "integer");
+    }
+
+    #[test]
+    fn effective_schema_falls_back_to_content_schema() {
+        let p = make_param(serde_json::json!({
+            "content": {"application/json": {"schema": {"type": "object"}}}
+        }));
+        let spec = empty_spec();
+        assert_eq!(render_param_type(effective_schema(&p), &spec), "object");
+    }
+
+    #[test]
+    fn effective_schema_content_with_no_schema_returns_string() {
+        let p = make_param(serde_json::json!({
+            "content": {"application/json": {}}
+        }));
+        let spec = empty_spec();
+        assert_eq!(render_param_type(effective_schema(&p), &spec), "string");
+    }
+
+    #[test]
+    fn effective_schema_neither_schema_nor_content_returns_string() {
+        let p = make_param(serde_json::json!({}));
+        let spec = empty_spec();
+        assert_eq!(render_param_type(effective_schema(&p), &spec), "string");
     }
 }

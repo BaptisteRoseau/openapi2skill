@@ -27,7 +27,7 @@ pub(super) fn render_response_headers_table(
         out.push_str(&format!(
             "| `{}` | {} | {} |\n",
             name,
-            render_param_type(&header.schema, spec),
+            render_param_type(header.schema.as_ref(), spec),
             header.description.as_deref().unwrap_or("-"),
         ));
     }
