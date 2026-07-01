@@ -20,10 +20,58 @@ pub(super) fn render_endpoint(
     multi_use: &HashSet<String>,
 ) -> String {
     let mut out = format!("# {method} {path}\n\n");
+    if op.deprecated == Some(true) {
+        out.push_str("> **Deprecated.** Avoid using this endpoint when an alternative exists.\n\n");
+    }
     out.push_str(&render_info_table(path, method, op, spec));
     out.push_str(&render_input_section(op, spec, multi_use));
     out.push_str(&render_responses_section(op, spec, multi_use));
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::render_endpoint;
+
+    fn spec_without_deprecated() -> oas3::OpenApiV3Spec {
+        oas3::from_json(
+            r#"{"openapi":"3.0.0","info":{"title":"T","version":"1"},"paths":{"/test":{"get":{"responses":{"200":{"description":"OK"}}}}}}"#,
+        )
+        .unwrap()
+    }
+
+    fn spec_with_deprecated() -> oas3::OpenApiV3Spec {
+        oas3::from_json(
+            r#"{"openapi":"3.0.0","info":{"title":"T","version":"1"},"paths":{"/test":{"get":{"deprecated":true,"responses":{"200":{"description":"OK"}}}}}}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn non_deprecated_has_no_notice() {
+        let spec = spec_without_deprecated();
+        let ops: Vec<_> = spec.operations().collect();
+        let (path, method, op) = &ops[0];
+        let out = render_endpoint(path, method.as_str(), op, &spec, &HashSet::new());
+        assert!(
+            !out.contains("Deprecated"),
+            "should not contain Deprecated:\n{out}"
+        );
+    }
+
+    #[test]
+    fn deprecated_has_notice() {
+        let spec = spec_with_deprecated();
+        let ops: Vec<_> = spec.operations().collect();
+        let (path, method, op) = &ops[0];
+        let out = render_endpoint(path, method.as_str(), op, &spec, &HashSet::new());
+        assert!(
+            out.contains("Deprecated"),
+            "should contain Deprecated:\n{out}"
+        );
+    }
 }
 
 fn render_input_section(

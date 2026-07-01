@@ -69,7 +69,7 @@ fn render(spec: &OpenApiV3Spec, name: &str, servers_override: &[String]) -> Stri
 
     let mut out = render_skill_header(name, title);
     out.push_str(&render_metadata(spec, servers_override));
-    out.push_str(&render_decription_and_navigation(description));
+    out.push_str(&render_decription_and_navigation(description, spec));
     out.push_str(&render_index(spec));
     out
 }
@@ -124,12 +124,20 @@ fn render_metadata(spec: &OpenApiV3Spec, servers_override: &[String]) -> String 
     out
 }
 
-fn render_decription_and_navigation(description: &str) -> String {
+fn has_deprecated_operations(spec: &OpenApiV3Spec) -> bool {
+    spec.operations()
+        .any(|(_, _, op)| op.deprecated == Some(true))
+}
+
+fn render_decription_and_navigation(description: &str, spec: &OpenApiV3Spec) -> String {
     let mut out = "".to_string();
     if !description.is_empty() {
         out.push_str(&format!("## API Description\n\n{description}\n\n"));
     }
     out.push_str("## Navigation\n\nGiven your goal, read the relevant index.md file links bellow and the ones they will be pointing to to read the endpoints descriptions you will need.\nAvoid using `ls` and `grep` as your first steps, but only when the indexes do not provide the information you need or if you have to search for a pattern.\nOther references will be given as markdown links, follow them only when required to achieve your goal. The less you read files, the better.");
+    if has_deprecated_operations(spec) {
+        out.push_str("\n\n> **Note:** Some endpoints are marked as deprecated. Prefer non-deprecated alternatives when available.");
+    }
     out
 }
 
@@ -186,6 +194,13 @@ mod tests {
         oas3::from_json(json).unwrap()
     }
 
+    fn minimal_spec_with_deprecated() -> OpenApiV3Spec {
+        oas3::from_json(
+            r#"{"openapi":"3.0.0","info":{"title":"Test API","version":"1.0.0"},"paths":{"/test":{"get":{"deprecated":true,"responses":{"200":{"description":"OK"}}}}}}"#,
+        )
+        .unwrap()
+    }
+
     #[test]
     fn server_override_replaces_spec_servers() {
         let spec = minimal_spec(&["https://spec.example.com"]);
@@ -225,6 +240,26 @@ mod tests {
         assert!(
             !out.contains("**Servers:**"),
             "servers section should be absent:\n{out}"
+        );
+    }
+
+    #[test]
+    fn navigation_has_no_deprecated_note_when_no_deprecated_ops() {
+        let spec = minimal_spec(&[]);
+        let out = render_decription_and_navigation("", &spec);
+        assert!(
+            !out.contains("deprecated"),
+            "should not contain deprecated note:\n{out}"
+        );
+    }
+
+    #[test]
+    fn navigation_has_deprecated_note_when_deprecated_ops_exist() {
+        let spec = minimal_spec_with_deprecated();
+        let out = render_decription_and_navigation("", &spec);
+        assert!(
+            out.contains("deprecated"),
+            "should contain deprecated note:\n{out}"
         );
     }
 }

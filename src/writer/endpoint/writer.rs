@@ -19,7 +19,7 @@ impl CollectWrites for Writer {
         writes: &mut Vec<(PathBuf, String)>,
     ) {
         let multi_use = collect_multi_use_schemas(spec);
-        let mut by_category: HashMap<String, Vec<(String, String, String)>> = HashMap::new();
+        let mut by_category: HashMap<String, Vec<(String, String, String, bool)>> = HashMap::new();
 
         for (path, method, op) in spec.operations() {
             let cat_slug = op_category(op, &path);
@@ -30,10 +30,13 @@ impl CollectWrites for Writer {
             );
             let summary = op.summary.as_deref().unwrap_or(path.as_str()).to_string();
             let content = render_endpoint(&path, method.as_str(), op, spec, &multi_use);
-            by_category
-                .entry(cat_slug)
-                .or_default()
-                .push((filename, summary, content));
+            let is_deprecated = op.deprecated == Some(true);
+            by_category.entry(cat_slug).or_default().push((
+                filename,
+                summary,
+                content,
+                is_deprecated,
+            ));
         }
 
         let mut sorted_cats: Vec<&String> = by_category.keys().collect();
@@ -55,7 +58,7 @@ impl CollectWrites for Writer {
 
 fn push_category_writes(
     cat_slug: &str,
-    entries: &[(String, String, String)],
+    entries: &[(String, String, String, bool)],
     dir: &Path,
     writes: &mut Vec<(PathBuf, String)>,
 ) {
@@ -63,7 +66,13 @@ fn push_category_writes(
 
     let index = entries
         .iter()
-        .map(|(filename, summary, _)| format!("- [{summary}](./{filename})"))
+        .map(|(filename, summary, _, is_deprecated)| {
+            if *is_deprecated {
+                format!("- ~~[{summary}](./{filename})~~ *(deprecated)*")
+            } else {
+                format!("- [{summary}](./{filename})")
+            }
+        })
         .collect::<Vec<_>>()
         .join("\n")
         + "\n";
@@ -71,7 +80,7 @@ fn push_category_writes(
     info!("Writing {:?}", write_path.0);
     writes.push(write_path);
 
-    for (filename, _, content) in entries {
+    for (filename, _, content, _) in entries {
         let write_path = (cat_dir.join(filename), content.clone());
         info!("Writing {:?}", write_path.0);
         writes.push(write_path);
