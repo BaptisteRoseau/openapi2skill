@@ -3,6 +3,7 @@
 
 mod auth;
 mod endpoint;
+pub(crate) mod extensions;
 mod pipeline;
 mod schema;
 mod skill;

@@ -11,6 +11,7 @@ use super::{
     info::render_info_table,
     params::{render_path_params_table, render_query_params_table},
 };
+use crate::writer::extensions::render_extensions_table;
 
 pub(super) fn render_endpoint(
     path: &str,
@@ -23,6 +24,7 @@ pub(super) fn render_endpoint(
     if op.deprecated == Some(true) {
         out.push_str("> **Deprecated.** Avoid using this endpoint when an alternative exists.\n\n");
     }
+    out.push_str(&render_extensions_table(&op.extensions));
     out.push_str(&render_info_table(path, method, op, spec));
     out.push_str(&render_input_section(op, spec, multi_use));
     out.push_str(&render_responses_section(op, spec, multi_use));

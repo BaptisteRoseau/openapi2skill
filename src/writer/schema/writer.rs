@@ -4,13 +4,17 @@ use std::{
 };
 
 use oas3::{
-    OpenApiV3Spec,
+    Map, OpenApiV3Spec,
     spec::{ObjectOrReference, Schema},
 };
+use serde_json::Value;
 use tracing::info;
 
 use super::render::render_schema_jsonc;
-use crate::writer::utils::{CollectWrites, build_index, camel_to_kebab};
+use crate::writer::{
+    extensions::render_extensions_table,
+    utils::{CollectWrites, build_index, camel_to_kebab},
+};
 
 pub(in crate::writer) struct Writer;
 
@@ -56,6 +60,7 @@ fn render_schema_file(name: &str, schema: &Schema, spec: &OpenApiV3Spec) -> Stri
             out.push_str("\n\n");
         }
     }
+    out.push_str(&render_extensions_table(schema_extensions(schema)));
     out.push_str("```jsonc\n");
     out.push_str(&render_schema_jsonc(schema, spec, &HashSet::new()));
     out.push('\n');
@@ -70,5 +75,16 @@ fn schema_description(schema: &Schema, spec: &OpenApiV3Spec) -> Option<String> {
             _ => None,
         },
         _ => None,
+    }
+}
+
+fn schema_extensions(schema: &Schema) -> &Map<String, Value> {
+    static EMPTY: std::sync::OnceLock<Map<String, Value>> = std::sync::OnceLock::new();
+    match schema {
+        Schema::Object(oor) => match oor.as_ref() {
+            ObjectOrReference::Object(obj) => &obj.extensions,
+            _ => EMPTY.get_or_init(Map::new),
+        },
+        _ => EMPTY.get_or_init(Map::new),
     }
 }
