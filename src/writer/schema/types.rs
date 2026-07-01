@@ -1,6 +1,6 @@
 use oas3::spec::{ObjectSchema, SchemaType, SchemaTypeSet};
 
-use crate::writer::utils::primary_type;
+use crate::writer::utils::{normalize_desc, primary_type};
 
 pub(super) fn primitive_type_name(obj: &ObjectSchema) -> String {
     match obj.schema_type.as_ref().map(primary_type) {
@@ -62,9 +62,9 @@ pub(super) fn type_comment(obj: &ObjectSchema, req: &str) -> String {
     }
     // Always put description at the end of the line
     if let Some(desc) = &obj.description {
-        let trimmed = desc.trim();
-        if !trimmed.is_empty() {
-            parts.push(trimmed.to_string());
+        let normalized = normalize_desc(desc);
+        if !normalized.is_empty() {
+            parts.push(normalized);
         }
     }
     parts.join(", ")
@@ -277,6 +277,15 @@ mod tests {
         assert_eq!(
             type_comment(&o, "required"),
             "string, required, The pet name"
+        );
+    }
+
+    #[test]
+    fn type_comment_normalizes_newlines_in_description() {
+        let o = obj(json!({"type": "string", "description": "First line.\nSecond line."}));
+        assert_eq!(
+            type_comment(&o, "optional"),
+            "string, optional, First line. Second line."
         );
     }
 

@@ -38,6 +38,91 @@ fn test_spec_writes_successfully(
     assert!(out.join("SKILL.md").exists(), "{path:?}: missing SKILL.md");
     assert_no_empty_schema(out.join("schemas"));
     assert_no_empty_schema(out.join("endpoints"));
+    assert_no_invalid_jsonc(out.join("schemas"));
+    assert_no_invalid_jsonc(out.join("endpoints"));
+}
+
+fn strip_jsonc_comments(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    let mut in_string = false;
+    while let Some(ch) = chars.next() {
+        match ch {
+            '\\' if in_string => {
+                out.push(ch);
+                if let Some(next) = chars.next() {
+                    out.push(next);
+                }
+            }
+            '"' => {
+                in_string = !in_string;
+                out.push(ch);
+            }
+            '/' if !in_string => match chars.peek() {
+                Some('/') => {
+                    chars.next();
+                    for c in chars.by_ref() {
+                        if c == '\n' {
+                            out.push('\n');
+                            break;
+                        }
+                    }
+                }
+                Some('*') => {
+                    chars.next();
+                    let mut prev = ' ';
+                    for c in chars.by_ref() {
+                        if prev == '*' && c == '/' {
+                            break;
+                        }
+                        prev = c;
+                    }
+                }
+                _ => out.push(ch),
+            },
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn extract_jsonc_blocks(content: &str) -> Vec<String> {
+    let mut blocks = Vec::new();
+    let mut rest = content;
+    while let Some(start) = rest.find("```jsonc\n") {
+        rest = &rest[start + "```jsonc\n".len()..];
+        if let Some(end) = rest.find("\n```") {
+            blocks.push(rest[..end].to_string());
+            rest = &rest[end + "\n```".len()..];
+        } else {
+            break;
+        }
+    }
+    blocks
+}
+
+fn assert_no_invalid_jsonc(dir: std::path::PathBuf) {
+    assert!(dir.is_dir());
+    for entry in std::fs::read_dir(&dir).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_dir() {
+            assert_no_invalid_jsonc(path);
+            continue;
+        }
+        if path.extension().and_then(|s| s.to_str()) != Some("md") {
+            continue;
+        }
+        let content = std::fs::read_to_string(&path).unwrap();
+        for block in extract_jsonc_blocks(&content) {
+            let stripped = strip_jsonc_comments(&block);
+            if let Err(e) = serde_json::from_str::<serde_json::Value>(&stripped) {
+                panic!(
+                    "invalid JSONC in {path:?}:\nerror: {e}\nstripped block:\n{stripped}\noriginal block:\n{block}"
+                );
+            }
+        }
+    }
 }
 
 /// Non-regression: every emitted schema file must contain a real definition.
