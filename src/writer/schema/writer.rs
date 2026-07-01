@@ -50,7 +50,11 @@ fn render_schema_file(name: &str, schema: &Schema, spec: &OpenApiV3Spec) -> Stri
     let description = schema_description(schema, spec);
     let mut out = format!("# {name}\n\n");
     if let Some(desc) = description {
-        out.push_str(&format!("{desc}\n\n"));
+        let desc = crate::writer::utils::normalize_desc(&desc);
+        if !desc.is_empty() {
+            out.push_str(&desc);
+            out.push_str("\n\n");
+        }
     }
     out.push_str("```jsonc\n");
     out.push_str(&render_schema_jsonc(schema, spec, &HashSet::new()));

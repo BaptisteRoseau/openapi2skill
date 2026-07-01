@@ -21,7 +21,11 @@ pub(super) fn render_path_params_table(params: &[&Parameter], spec: &OpenApiV3Sp
             "| `{}` | {} | {req} | {} |\n",
             p.name,
             render_param_type(effective_schema(p), spec),
-            p.description.as_deref().unwrap_or("-"),
+            p.description
+                .as_deref()
+                .map(crate::writer::utils::normalize_desc)
+                .as_deref()
+                .unwrap_or("-"),
         ));
     }
     out.push('\n');
@@ -43,7 +47,11 @@ pub(super) fn render_query_params_table(params: &[&Parameter], spec: &OpenApiV3S
             "| `{}` | {} | {req} | {} |\n",
             p.name,
             render_param_type(effective_schema(p), spec),
-            p.description.as_deref().unwrap_or("-"),
+            p.description
+                .as_deref()
+                .map(crate::writer::utils::normalize_desc)
+                .as_deref()
+                .unwrap_or("-"),
         ));
     }
     out.push('\n');

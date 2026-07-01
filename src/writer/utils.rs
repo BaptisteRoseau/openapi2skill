@@ -141,6 +141,16 @@ pub(crate) fn primary_type(ts: &SchemaTypeSet) -> SchemaType {
     }
 }
 
+/// Normalises a description string from a spec for use in markdown output.
+///
+/// Single `\n` inside descriptions is a soft wrap in the source spec but renders as a visible
+/// line break in raw-file readers (AI agents). Replacing every `\n` with a space keeps
+/// descriptions single-line and compact. Leading/trailing whitespace is also trimmed.
+pub(crate) fn normalize_desc(s: &str) -> String {
+    let replaced = s.replace('\n', " ");
+    replaced.trim().to_string()
+}
+
 pub(crate) fn build_index(links: &[(String, String)]) -> String {
     links
         .iter()
@@ -154,6 +164,38 @@ pub(crate) fn build_index(links: &[(String, String)]) -> String {
 mod tests {
     use super::*;
     use oas3::spec::{SchemaType, SchemaTypeSet};
+
+    // --- normalize_desc ---
+
+    #[test]
+    fn normalize_desc_replaces_single_newline_with_space() {
+        assert_eq!(normalize_desc("foo\nbar"), "foo bar");
+    }
+
+    #[test]
+    fn normalize_desc_trims_trailing_newline() {
+        assert_eq!(normalize_desc("foo\n"), "foo");
+    }
+
+    #[test]
+    fn normalize_desc_trims_trailing_whitespace() {
+        assert_eq!(normalize_desc("foo   "), "foo");
+    }
+
+    #[test]
+    fn normalize_desc_double_newline_collapses_to_two_spaces() {
+        assert_eq!(normalize_desc("foo\n\nbar"), "foo  bar");
+    }
+
+    #[test]
+    fn normalize_desc_empty_string_stays_empty() {
+        assert_eq!(normalize_desc(""), "");
+    }
+
+    #[test]
+    fn normalize_desc_no_newlines_passthrough() {
+        assert_eq!(normalize_desc("hello world"), "hello world");
+    }
 
     // --- infer_skill_name ---
 

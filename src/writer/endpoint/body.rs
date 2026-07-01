@@ -80,8 +80,11 @@ fn render_response(
         out.push_str(&format!("**Response Content-Type:** {types}\n\n"));
     }
     if let Some(desc) = &resp.description {
-        out.push_str(desc);
-        out.push_str("\n\n");
+        let desc = crate::writer::utils::normalize_desc(desc);
+        if !desc.is_empty() {
+            out.push_str(&desc);
+            out.push_str("\n\n");
+        }
     }
     out.push_str(&render_response_headers_table(&resp.headers, spec));
     out.push_str(&render_response_body(&resp, spec, multi_use));

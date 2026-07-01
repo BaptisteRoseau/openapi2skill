@@ -41,7 +41,7 @@ use oas3::{
 };
 use tracing::{info, warn};
 
-use super::utils::{CollectWrites, build_index};
+use super::utils::{CollectWrites, build_index, normalize_desc};
 
 pub(super) struct Writer;
 
@@ -155,8 +155,9 @@ fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
 
 fn render_header(name: &str, description: Option<&str>) -> String {
     let mut out = format!("# {name}\n\n");
-    if let Some(desc) = description.filter(|d| !d.is_empty()) {
-        out.push_str(&format!("{desc}\n\n"));
+    if let Some(desc) = description.map(normalize_desc).filter(|d| !d.is_empty()) {
+        out.push_str(&desc);
+        out.push_str("\n\n");
     }
     out
 }
@@ -204,7 +205,7 @@ fn render_scopes(scopes: &oas3::Map<String, String>) -> String {
     }
     let mut out = "**Scopes:**\n\n| Scope | Description |\n|-------|-------------|\n".to_string();
     for (scope, desc) in scopes {
-        out.push_str(&format!("| `{scope}` | {desc} |\n"));
+        out.push_str(&format!("| `{scope}` | {} |\n", normalize_desc(desc)));
     }
     out.push('\n');
     out
