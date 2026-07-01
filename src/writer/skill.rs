@@ -134,9 +134,9 @@ fn render_decription_and_navigation(description: &str, spec: &OpenApiV3Spec) -> 
     if !description.is_empty() {
         out.push_str(&format!("## API Description\n\n{description}\n\n"));
     }
-    out.push_str("## Navigation\n\nGiven your goal, read the relevant index.md file links bellow and the ones they will be pointing to to read the endpoints descriptions you will need.\nAvoid using `ls` and `grep` as your first steps, but only when the indexes do not provide the information you need or if you have to search for a pattern.\nOther references will be given as markdown links, follow them only when required to achieve your goal. The less you read files, the better.");
+    out.push_str("## Navigation\n\nGiven your goal, read the relevant index.md file links bellow and subsequent file to the endpoints required to achieve your task.\nAvoid using `ls` and `grep`, use them only when after the indexes if they did not provide the information required, or if you have to search for a specific pattern.\nOnly follow markdown links references required to achieve your goal. The less files you read, the better.");
     if has_deprecated_operations(spec) {
-        out.push_str("\n\n> **Note:** Some endpoints are marked as deprecated. Prefer non-deprecated alternatives when available.");
+        out.push_str("\n\nSome endpoints are marked as deprecated. Prefer non-deprecated alternatives when available.\n\n");
     }
     out
 }
