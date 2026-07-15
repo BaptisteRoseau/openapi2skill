@@ -1,0 +1,3 @@
+- [Finds Pets by status](./get-pet-find-by-status-multiple-examples.md)
+- [Finds Pets by status](./get-pet-find-by-status-single-example.md)
+- [Add a new pet to the store](./post-pet.md)
