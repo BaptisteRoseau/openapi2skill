@@ -6,12 +6,12 @@ pub(super) fn render_info_table(
     method: &str,
     op: &Operation,
     spec: &OpenApiV3Spec,
+    servers: &[String],
 ) -> String {
     let mut out = "| | |\n|--|--|\n".to_string();
     out.push_str(&format!("| **Method** | `{method}` |\n"));
     out.push_str(&format!("| **URL** | `{path}` |\n"));
-    if spec.servers.len() == 1 {
-        let base = spec.servers[0].url.trim_end_matches('/');
+    for base in servers {
         out.push_str(&format!("| **Full URL** | `{base}{path}` |\n"));
     }
     out.push_str(&format!(
@@ -80,5 +80,66 @@ fn format_security_scheme(scheme: &str, scopes: &[String]) -> String {
     match scopes {
         [] => scheme.to_string(),
         _ => format!("{scheme} (scopes: {})", scopes.join(", ")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_info_table;
+
+    fn spec_with_operation(server_url: &str) -> oas3::OpenApiV3Spec {
+        let json = format!(
+            r#"{{"openapi":"3.0.0","info":{{"title":"T","version":"1"}},"servers":[{{"url":"{server_url}"}}],"paths":{{"/query":{{"get":{{"responses":{{"200":{{"description":"OK"}}}}}}}}}}}}"#
+        );
+        oas3::from_json(json).unwrap()
+    }
+
+    fn render(spec: &oas3::OpenApiV3Spec, servers: &[String]) -> String {
+        let ops: Vec<_> = spec.operations().collect();
+        let (path, method, op) = &ops[0];
+        render_info_table(path, method.as_str(), op, spec, servers)
+    }
+
+    #[test]
+    fn full_url_uses_provided_server() {
+        let spec = spec_with_operation("http://spec-host:9090");
+        let servers = vec!["http://cli-host:9090".to_string()];
+        let out = render(&spec, &servers);
+        assert!(
+            out.contains("| **Full URL** | `http://cli-host:9090/query` |"),
+            "expected CLI server in Full URL:\n{out}"
+        );
+        assert!(
+            !out.contains("spec-host"),
+            "spec server must not leak into Full URL:\n{out}"
+        );
+    }
+
+    #[test]
+    fn full_url_renders_one_row_per_server() {
+        let spec = spec_with_operation("http://spec-host:9090");
+        let servers = vec![
+            "http://first:9090".to_string(),
+            "https://second:9090".to_string(),
+        ];
+        let out = render(&spec, &servers);
+        assert!(
+            out.contains("| **Full URL** | `http://first:9090/query` |"),
+            "expected first server:\n{out}"
+        );
+        assert!(
+            out.contains("| **Full URL** | `https://second:9090/query` |"),
+            "expected second server:\n{out}"
+        );
+    }
+
+    #[test]
+    fn no_full_url_row_when_no_servers() {
+        let spec = spec_with_operation("http://spec-host:9090");
+        let out = render(&spec, &[]);
+        assert!(
+            !out.contains("Full URL"),
+            "no Full URL row expected when server list is empty:\n{out}"
+        );
     }
 }

@@ -24,7 +24,7 @@ cargo install openapi2skill
 
 ## Usage
 
-```
+```cmd
 Convert an OpenAPI 3.x specification into an AI Agent Skill — a tree of markdown files an AI agent can navigate efficiently.
 
 Usage: openapi2skill [OPTIONS] <PATH_OR_URL>
@@ -33,9 +33,10 @@ Arguments:
   <PATH_OR_URL>  Open API source (URL or file path)
 
 Options:
-  -o, --output-dir <OUTPUT_DIR>  Output directory
-  -v, --verbose                  Enable output
+  -o, --output-dir <OUTPUT_DIR>  Output directory, also used as the name ok the skill when provided
+  -v, --verbose                  Enable stdout output
   -f, --force                    Remove existing output directory
+      --server <URL>             Override the server URL(s) from the spec. Can be specified multiple times (e.g. `--server api.example.com --server https://staging.example.com`). If the URL has no scheme, `https://` is prepended automatically
   -h, --help                     Print help
   -V, --version                  Print version
 ```
@@ -53,7 +54,10 @@ openapi2skill https://petstore3.swagger.io/api/v3/openapi.json
 openapi2skill petstore.yaml --output-dir my_skill
 
 # Make it directly available to Claude Code
-openapi2skill https://petstore3.swagger.io/api/v3/openapi.json --output-dir .claude/skills/api_petstore --force
+openapi2skill https://petstore3.swagger.io/api/v3/openapi.json \
+    --server http://mypetstore.com/ \
+    --output-dir .claude/skills/api_petstore \
+    --force
 ```
 
 ## Skill architecture

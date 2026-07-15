@@ -151,6 +151,27 @@ pub(crate) fn normalize_desc(s: &str) -> String {
     replaced.trim().to_string()
 }
 
+/// Returns the base server URLs to use when rendering "Full URL" fields, each trimmed of a
+/// trailing slash.
+///
+/// The CLI `--server` override (`servers_override`) takes precedence over the spec's declared
+/// servers so that every endpoint file documents the host the agent will actually call. When no
+/// override is given, the spec's own servers are used.
+pub(crate) fn effective_server_bases(
+    spec: &OpenApiV3Spec,
+    servers_override: &[String],
+) -> Vec<String> {
+    let sources: Vec<String> = if servers_override.is_empty() {
+        spec.servers.iter().map(|s| s.url.clone()).collect()
+    } else {
+        servers_override.to_vec()
+    };
+    sources
+        .iter()
+        .map(|url| url.trim_end_matches('/').to_string())
+        .collect()
+}
+
 pub(crate) fn build_index(links: &[(String, String)]) -> String {
     links
         .iter()
@@ -353,6 +374,69 @@ mod tests {
     #[test]
     fn build_index_empty_is_just_newline() {
         assert_eq!(build_index(&[]), "\n");
+    }
+
+    // --- effective_server_bases ---
+
+    fn spec_with_servers(urls: &[&str]) -> OpenApiV3Spec {
+        let servers_json = urls
+            .iter()
+            .map(|u| format!(r#"{{"url":"{u}"}}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        let json = format!(
+            r#"{{"openapi":"3.0.0","info":{{"title":"T","version":"1"}},"servers":[{servers_json}],"paths":{{}}}}"#
+        );
+        oas3::from_json(json).unwrap()
+    }
+
+    #[test]
+    fn effective_server_bases_prefers_override() {
+        let spec = spec_with_servers(&["http://spec-host:9090"]);
+        let overrides = vec!["http://cli-host:9090".to_string()];
+        assert_eq!(
+            effective_server_bases(&spec, &overrides),
+            vec!["http://cli-host:9090".to_string()]
+        );
+    }
+
+    #[test]
+    fn effective_server_bases_keeps_override_list_order() {
+        let spec = spec_with_servers(&["http://spec-host:9090"]);
+        let overrides = vec![
+            "http://first:9090".to_string(),
+            "https://second:9090".to_string(),
+        ];
+        assert_eq!(effective_server_bases(&spec, &overrides), overrides);
+    }
+
+    #[test]
+    fn effective_server_bases_falls_back_to_spec() {
+        let spec = spec_with_servers(&["http://spec-host:9090"]);
+        assert_eq!(
+            effective_server_bases(&spec, &[]),
+            vec!["http://spec-host:9090".to_string()]
+        );
+    }
+
+    #[test]
+    fn effective_server_bases_trims_trailing_slash() {
+        let spec = spec_with_servers(&["http://spec-host:9090/"]);
+        assert_eq!(
+            effective_server_bases(&spec, &[]),
+            vec!["http://spec-host:9090".to_string()]
+        );
+        let overrides = vec!["http://cli-host:9090/api/v1/".to_string()];
+        assert_eq!(
+            effective_server_bases(&spec, &overrides),
+            vec!["http://cli-host:9090/api/v1".to_string()]
+        );
+    }
+
+    #[test]
+    fn effective_server_bases_empty_when_no_servers() {
+        let spec = spec_with_servers(&[]);
+        assert!(effective_server_bases(&spec, &[]).is_empty());
     }
 
     // --- primary_type ---

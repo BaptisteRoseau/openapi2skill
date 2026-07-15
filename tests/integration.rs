@@ -155,7 +155,7 @@ fn assert_no_empty_schema(dir: std::path::PathBuf) {
 fn test_generates_expected_files() {
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("out");
-    let output = run_binary("tests/assets/openapi.json", &out);
+    let output = run_binary("tests/assets/petstore.json", &out);
     assert!(
         output.status.success(),
         "binary exited with failure:\n{}",
@@ -205,8 +205,8 @@ fn test_generates_expected_files() {
 fn test_error_when_output_dir_exists() {
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("out");
-    run_binary("tests/assets/openapi.json", &out);
-    let output = run_binary("tests/assets/openapi.json", &out);
+    run_binary("tests/assets/petstore.json", &out);
+    let output = run_binary("tests/assets/petstore.json", &out);
     assert!(
         !output.status.success(),
         "binary should fail when output dir already exists"
@@ -222,8 +222,8 @@ fn test_error_when_output_dir_exists() {
 fn test_force_overwrites_existing_dir() {
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("out");
-    run_binary("tests/assets/openapi.json", &out);
-    let output = run_binary_with_args("tests/assets/openapi.json", &out, &["--force"]);
+    run_binary("tests/assets/petstore.json", &out);
+    let output = run_binary_with_args("tests/assets/petstore.json", &out, &["--force"]);
     assert!(
         output.status.success(),
         "binary should succeed with --force when output dir already exists:\n{}",
@@ -266,7 +266,7 @@ fn test_server_override_appears_in_skill_md() {
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("out");
     let output = run_binary_with_args(
-        "tests/assets/openapi.json",
+        "tests/assets/petstore.json",
         &out,
         &[
             "--server",
@@ -296,10 +296,82 @@ fn test_server_override_appears_in_skill_md() {
 }
 
 #[test]
+fn test_server_override_rewrites_endpoint_full_url() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out");
+    let output = run_binary_with_args(
+        "tests/assets/petstore.json",
+        &out,
+        &["--server", "http://127.0.0.1:9090"],
+    );
+    assert!(
+        output.status.success(),
+        "binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let endpoint_md = std::fs::read_to_string(out.join("endpoints/pet/post-pet.md")).unwrap();
+    assert!(
+        endpoint_md.contains("| **Full URL** | `http://127.0.0.1:9090/pet` |"),
+        "endpoint Full URL should use the CLI --server override:\n{endpoint_md}"
+    );
+    assert!(
+        !endpoint_md.contains("petstore.swagger.io"),
+        "spec server should not appear in endpoint Full URL when --server is given:\n{endpoint_md}"
+    );
+}
+
+#[test]
+fn test_multiple_server_overrides_render_multiple_full_urls() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out");
+    let output = run_binary_with_args(
+        "tests/assets/petstore.json",
+        &out,
+        &[
+            "--server",
+            "http://127.0.0.1:9090",
+            "--server",
+            "https://prod.example.com",
+        ],
+    );
+    assert!(
+        output.status.success(),
+        "binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let endpoint_md = std::fs::read_to_string(out.join("endpoints/pet/post-pet.md")).unwrap();
+    assert!(
+        endpoint_md.contains("| **Full URL** | `http://127.0.0.1:9090/pet` |"),
+        "first --server override missing from endpoint:\n{endpoint_md}"
+    );
+    assert!(
+        endpoint_md.contains("| **Full URL** | `https://prod.example.com/pet` |"),
+        "second --server override missing from endpoint:\n{endpoint_md}"
+    );
+}
+
+#[test]
+fn test_endpoint_full_url_defaults_to_spec_server() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out");
+    let output = run_binary("tests/assets/petstore.json", &out);
+    assert!(
+        output.status.success(),
+        "binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let endpoint_md = std::fs::read_to_string(out.join("endpoints/pet/post-pet.md")).unwrap();
+    assert!(
+        endpoint_md.contains("| **Full URL** | `http://petstore.swagger.io/v2/pet` |"),
+        "endpoint Full URL should fall back to the spec server when no --server is given:\n{endpoint_md}"
+    );
+}
+
+#[test]
 fn test_no_auth_dir_when_no_schemes() {
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("out");
-    let output = run_binary("tests/assets/openapi.json", &out);
+    let output = run_binary("tests/assets/petstore.json", &out);
     assert!(
         output.status.success(),
         "binary exited with failure:\n{}",

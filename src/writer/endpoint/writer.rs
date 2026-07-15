@@ -7,9 +7,13 @@ use oas3::OpenApiV3Spec;
 use tracing::info;
 
 use super::{refs::collect_multi_use_schemas, render::render_endpoint};
-use crate::writer::utils::{CollectWrites, category_label, op_category, path_to_slug};
+use crate::writer::utils::{
+    CollectWrites, category_label, effective_server_bases, op_category, path_to_slug,
+};
 
-pub(in crate::writer) struct Writer;
+pub(in crate::writer) struct Writer {
+    pub(in crate::writer) servers_override: Vec<String>,
+}
 
 impl CollectWrites for Writer {
     fn collect_writes(
@@ -19,6 +23,7 @@ impl CollectWrites for Writer {
         writes: &mut Vec<(PathBuf, String)>,
     ) {
         let multi_use = collect_multi_use_schemas(spec);
+        let servers = effective_server_bases(spec, &self.servers_override);
         let mut by_category: HashMap<String, Vec<(String, String, String, bool)>> = HashMap::new();
 
         for (path, method, op) in spec.operations() {
@@ -29,7 +34,7 @@ impl CollectWrites for Writer {
                 path_to_slug(&path)
             );
             let summary = op.summary.as_deref().unwrap_or(path.as_str()).to_string();
-            let content = render_endpoint(&path, method.as_str(), op, spec, &multi_use);
+            let content = render_endpoint(&path, method.as_str(), op, spec, &multi_use, &servers);
             let is_deprecated = op.deprecated == Some(true);
             by_category.entry(cat_slug).or_default().push((
                 filename,

@@ -4,7 +4,7 @@
 //!
 //! ---
 //! name: Grafana HTTP API.
-//! description: The API documentation and specifiations of Grafana HTTP API.
+//! description: The API documentation and specifications of Grafana HTTP API.
 //! allowed-tools:
 //!   - Read
 //!   - Bash(ls *)
@@ -76,7 +76,7 @@ fn render(spec: &OpenApiV3Spec, name: &str, servers_override: &[String]) -> Stri
 
 fn render_skill_header(name: &str, title: &str) -> String {
     format!(
-        "---\nname: {name}\ndescription: The API documentation and specifiations of {title}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
+        "---\nname: {name}\ndescription: The API documentation and specifications of {title}\nallowed-tools:\n  - Read\n  - Bash(ls *)\n  - Bash(grep *)\n  - Bash(find *)\n---\n\n# {title} Documentation\n\n"
     )
 }
 

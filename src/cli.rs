@@ -22,7 +22,9 @@ pub struct CliConfig {
 
     /// Override the server URL(s) from the spec. Can be specified multiple times
     /// (e.g. `--server api.example.com --server https://staging.example.com`).
-    /// If the URL has no scheme, `https://` is prepended automatically.
+    /// If the URL has no scheme, `https://` is prepended automatically. The override
+    /// must include any base path the endpoints are relative to (e.g.
+    /// `--server http://host:9090/api/v1`)
     #[arg(long, value_name = "URL")]
     pub server: Vec<String>,
 }

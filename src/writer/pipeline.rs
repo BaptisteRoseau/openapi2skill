@@ -38,12 +38,13 @@ pub async fn openapi2skill(
 
     let skill_writer = skill::Writer {
         name: skill_name,
-        servers_override,
+        servers_override: servers_override.clone(),
     };
+    let endpoint_writer = endpoint::Writer { servers_override };
     let writers: &[&dyn CollectWrites] = &[
         &skill_writer,
         &auth::Writer,
-        &endpoint::Writer,
+        &endpoint_writer,
         &schema::Writer,
     ];
     for w in writers {
