@@ -87,9 +87,24 @@ SKILL.md                         # frontmatter (name, description, allowed-tools
 
 Each endpoint file includes the HTTP method, URL, auth requirements, path/query parameters, a typed request body example, and typed response examples — all in a compact markdown + jsonc format.
 
+Examples of generated skills can be found under [examples](./examples):
+
+- [Petstore](./examples/api-petstore)
+- [Spotify](examples/api-spotify)
+
 ## Troubleshooting
 
 If you encounter a warning or an error, feel free to open an issue in this repository, but always include the openapi.json link or file.
+
+## Related Skills
+
+Usefull skills using this tool can be found under [skills](./skills):
+
+- [API Skill Generator](skills/api-skill-generator): Instructions on how to find then convert an Open API spec from the internet.
+    Just ask your AI agent "generate a skill to interract with Prometheus REST API",
+    the agent handles the specification search and the conversion.
+
+To use them, simply copy `skills/*` under your `.agents/skills/*` folder.
 
 ## License
 
