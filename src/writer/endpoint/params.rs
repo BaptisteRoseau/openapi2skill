@@ -6,6 +6,83 @@ use oas3::{
 };
 use tracing::warn;
 
+/// Returns `?key=val&key=val` for all required query parameters, or `""` if none.
+pub(super) fn required_query_string(params: &[&Parameter], spec: &OpenApiV3Spec) -> String {
+    let pairs: Vec<String> = params
+        .iter()
+        .filter(|p| p.required.unwrap_or(false))
+        .map(|p| format!("{}={}", p.name, query_param_example(p, spec)))
+        .collect();
+    if pairs.is_empty() {
+        return String::new();
+    }
+    format!("?{}", pairs.join("&"))
+}
+
+fn query_param_example(p: &Parameter, spec: &OpenApiV3Spec) -> String {
+    query_example_from_schema(effective_schema(p), spec)
+}
+
+fn query_example_from_schema(schema: Option<&Schema>, spec: &OpenApiV3Spec) -> String {
+    let schema = match schema {
+        None => return "string".to_string(),
+        Some(s) => s,
+    };
+    let resolved = match schema.resolve(spec) {
+        Ok(r) => r,
+        Err(_) => return "string".to_string(),
+    };
+    match resolved {
+        Schema::Boolean(_) => "false".to_string(),
+        Schema::Object(oor) => match oor.as_ref() {
+            ObjectOrReference::Object(obj) => query_example_from_object(obj),
+            ObjectOrReference::Ref { .. } => "string".to_string(),
+        },
+    }
+}
+
+fn query_example_from_object(obj: &ObjectSchema) -> String {
+    if let Some(ex) = &obj.example {
+        if let Some(s) = ex.as_str() {
+            return s.to_string();
+        }
+        if let Some(n) = ex.as_i64() {
+            return n.to_string();
+        }
+        if let Some(b) = ex.as_bool() {
+            return b.to_string();
+        }
+    }
+    if let Some(first) = obj.enum_values.first() {
+        if let Some(s) = first.as_str() {
+            return s.to_string();
+        }
+        if let Some(n) = first.as_i64() {
+            return n.to_string();
+        }
+    }
+    type_based_query_example(obj.schema_type.as_ref())
+}
+
+fn type_based_query_example(ts: Option<&SchemaTypeSet>) -> String {
+    match ts {
+        None => "string".to_string(),
+        Some(SchemaTypeSet::Single(t)) => single_type_query_example(*t),
+        Some(SchemaTypeSet::Multiple(types)) => types
+            .first()
+            .map(|t| single_type_query_example(*t))
+            .unwrap_or_else(|| "string".to_string()),
+    }
+}
+
+fn single_type_query_example(t: SchemaType) -> String {
+    match t {
+        SchemaType::Integer | SchemaType::Number => "0".to_string(),
+        SchemaType::Boolean => "false".to_string(),
+        _ => "string".to_string(),
+    }
+}
+
 pub(super) fn render_path_params_table(params: &[&Parameter], spec: &OpenApiV3Spec) -> String {
     if params.is_empty() {
         return String::new();
@@ -376,5 +453,104 @@ mod tests {
         let p = make_param(serde_json::json!({}));
         let spec = empty_spec();
         assert_eq!(render_param_type(effective_schema(&p), &spec), "string");
+    }
+
+    fn required_query_param(name: &str, schema: serde_json::Value) -> Parameter {
+        let value =
+            serde_json::json!({"name": name, "in": "query", "required": true, "schema": schema});
+        serde_json::from_value(value).unwrap()
+    }
+
+    fn optional_query_param(name: &str, schema: serde_json::Value) -> Parameter {
+        let value =
+            serde_json::json!({"name": name, "in": "query", "required": false, "schema": schema});
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn required_query_string_empty_when_no_params() {
+        let spec = empty_spec();
+        assert_eq!(required_query_string(&[], &spec), "");
+    }
+
+    #[test]
+    fn required_query_string_skips_optional_params() {
+        let spec = empty_spec();
+        let p = optional_query_param("page", serde_json::json!({"type": "integer"}));
+        assert_eq!(required_query_string(&[&p], &spec), "");
+    }
+
+    #[test]
+    fn required_query_string_single_string_param() {
+        let spec = empty_spec();
+        let p = required_query_param("from", serde_json::json!({"type": "string"}));
+        assert_eq!(required_query_string(&[&p], &spec), "?from=string");
+    }
+
+    #[test]
+    fn required_query_string_single_integer_param() {
+        let spec = empty_spec();
+        let p = required_query_param("limit", serde_json::json!({"type": "integer"}));
+        assert_eq!(required_query_string(&[&p], &spec), "?limit=0");
+    }
+
+    #[test]
+    fn required_query_string_single_boolean_param() {
+        let spec = empty_spec();
+        let p = required_query_param("active", serde_json::json!({"type": "boolean"}));
+        assert_eq!(required_query_string(&[&p], &spec), "?active=false");
+    }
+
+    #[test]
+    fn required_query_string_multiple_required_params() {
+        let spec = empty_spec();
+        let from = required_query_param("from", serde_json::json!({"type": "string"}));
+        let to = required_query_param("to", serde_json::json!({"type": "string"}));
+        assert_eq!(
+            required_query_string(&[&from, &to], &spec),
+            "?from=string&to=string"
+        );
+    }
+
+    #[test]
+    fn required_query_string_mixed_required_and_optional() {
+        let spec = empty_spec();
+        let from = required_query_param("from", serde_json::json!({"type": "string"}));
+        let page = optional_query_param("page", serde_json::json!({"type": "integer"}));
+        let to = required_query_param("to", serde_json::json!({"type": "string"}));
+        assert_eq!(
+            required_query_string(&[&from, &page, &to], &spec),
+            "?from=string&to=string"
+        );
+    }
+
+    #[test]
+    fn required_query_string_uses_example_value() {
+        let spec = empty_spec();
+        let p = required_query_param(
+            "status",
+            serde_json::json!({"type": "string", "example": "active"}),
+        );
+        assert_eq!(required_query_string(&[&p], &spec), "?status=active");
+    }
+
+    #[test]
+    fn required_query_string_uses_first_enum_value() {
+        let spec = empty_spec();
+        let p = required_query_param(
+            "sort",
+            serde_json::json!({"type": "string", "enum": ["asc", "desc"]}),
+        );
+        assert_eq!(required_query_string(&[&p], &spec), "?sort=asc");
+    }
+
+    #[test]
+    fn required_query_string_no_schema_defaults_to_string() {
+        let spec = empty_spec();
+        let p: Parameter = serde_json::from_value(
+            serde_json::json!({"name": "q", "in": "query", "required": true}),
+        )
+        .unwrap();
+        assert_eq!(required_query_string(&[&p], &spec), "?q=string");
     }
 }

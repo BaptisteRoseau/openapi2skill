@@ -2,14 +2,14 @@ use std::collections::HashSet;
 
 use oas3::{
     OpenApiV3Spec,
-    spec::{Operation, ParameterIn},
+    spec::{Operation, Parameter, ParameterIn},
 };
 use tracing::warn;
 
 use super::{
     body::{render_payload_section, render_responses_section},
     info::render_info_table,
-    params::{render_path_params_table, render_query_params_table},
+    params::{render_path_params_table, render_query_params_table, required_query_string},
 };
 use crate::writer::extensions::render_extensions_table;
 
@@ -26,19 +26,29 @@ pub(super) fn render_endpoint(
         out.push_str("> **Deprecated.** Avoid using this endpoint when an alternative exists.\n\n");
     }
     out.push_str(&render_extensions_table(&op.extensions));
-    out.push_str(&render_info_table(path, method, op, spec, servers));
-    out.push_str(&render_input_section(op, spec, multi_use));
+
+    let resolved_params = resolve_params(op, spec);
+    let query_params: Vec<_> = resolved_params
+        .iter()
+        .filter(|p| p.location == ParameterIn::Query)
+        .collect();
+    let query_suffix = required_query_string(&query_params, spec);
+
+    out.push_str(&render_info_table(
+        path,
+        method,
+        op,
+        spec,
+        servers,
+        &query_suffix,
+    ));
+    out.push_str(&render_input_section(op, &resolved_params, spec, multi_use));
     out.push_str(&render_responses_section(op, spec, multi_use));
     out
 }
 
-fn render_input_section(
-    op: &Operation,
-    spec: &OpenApiV3Spec,
-    multi_use: &HashSet<String>,
-) -> String {
-    let params: Vec<_> = op
-        .parameters
+fn resolve_params(op: &Operation, spec: &OpenApiV3Spec) -> Vec<Parameter> {
+    op.parameters
         .iter()
         .filter_map(|p| match p.resolve(spec) {
             Ok(param) => Some(param),
@@ -50,12 +60,20 @@ fn render_input_section(
                 None
             }
         })
-        .collect();
-    let path_params: Vec<_> = params
+        .collect()
+}
+
+fn render_input_section(
+    op: &Operation,
+    resolved_params: &[Parameter],
+    spec: &OpenApiV3Spec,
+    multi_use: &HashSet<String>,
+) -> String {
+    let path_params: Vec<_> = resolved_params
         .iter()
         .filter(|p| p.location == ParameterIn::Path)
         .collect();
-    let query_params: Vec<_> = params
+    let query_params: Vec<_> = resolved_params
         .iter()
         .filter(|p| p.location == ParameterIn::Query)
         .collect();

@@ -7,12 +7,15 @@ pub(super) fn render_info_table(
     op: &Operation,
     spec: &OpenApiV3Spec,
     servers: &[String],
+    query_suffix: &str,
 ) -> String {
     let mut out = "| | |\n|--|--|\n".to_string();
     out.push_str(&format!("| **Method** | `{method}` |\n"));
     out.push_str(&format!("| **URL** | `{path}` |\n"));
     for base in servers {
-        out.push_str(&format!("| **Full URL** | `{base}{path}` |\n"));
+        out.push_str(&format!(
+            "| **Full URL** | `{base}{path}{query_suffix}` |\n"
+        ));
     }
     out.push_str(&format!(
         "| **Auth** | {} |\n",
@@ -95,9 +98,17 @@ mod tests {
     }
 
     fn render(spec: &oas3::OpenApiV3Spec, servers: &[String]) -> String {
+        render_with_suffix(spec, servers, "")
+    }
+
+    fn render_with_suffix(
+        spec: &oas3::OpenApiV3Spec,
+        servers: &[String],
+        query_suffix: &str,
+    ) -> String {
         let ops: Vec<_> = spec.operations().collect();
         let (path, method, op) = &ops[0];
-        render_info_table(path, method.as_str(), op, spec, servers)
+        render_info_table(path, method.as_str(), op, spec, servers, query_suffix)
     }
 
     #[test]
@@ -140,6 +151,37 @@ mod tests {
         assert!(
             !out.contains("Full URL"),
             "no Full URL row expected when server list is empty:\n{out}"
+        );
+    }
+
+    #[test]
+    fn full_url_appends_query_suffix() {
+        let spec = spec_with_operation("https://api.example.com");
+        let servers = vec!["https://api.example.com".to_string()];
+        let out = render_with_suffix(&spec, &servers, "?from=string&to=string");
+        assert!(
+            out.contains(
+                "| **Full URL** | `https://api.example.com/query?from=string&to=string` |"
+            ),
+            "expected query suffix in Full URL:\n{out}"
+        );
+    }
+
+    #[test]
+    fn full_url_appends_suffix_to_all_servers() {
+        let spec = spec_with_operation("https://api.example.com");
+        let servers = vec![
+            "https://prod.example.com".to_string(),
+            "https://staging.example.com".to_string(),
+        ];
+        let out = render_with_suffix(&spec, &servers, "?q=string");
+        assert!(
+            out.contains("| **Full URL** | `https://prod.example.com/query?q=string` |"),
+            "expected suffix on first server:\n{out}"
+        );
+        assert!(
+            out.contains("| **Full URL** | `https://staging.example.com/query?q=string` |"),
+            "expected suffix on second server:\n{out}"
         );
     }
 }
