@@ -20,8 +20,17 @@ async fn main() -> Result<(), anyhow::Error> {
         .map(|s| normalize_server_url(s))
         .collect();
 
+    let source_url = fetcher::is_url(&config.path_or_url).then(|| config.path_or_url.clone());
+
     let doc = load_oapi(config.path_or_url.as_str()).await?;
-    openapi2skill(&doc, config.output_dir.as_deref(), config.force, servers).await?;
+    openapi2skill(
+        &doc,
+        config.output_dir.as_deref(),
+        config.force,
+        servers,
+        source_url,
+    )
+    .await?;
 
     Ok(())
 }

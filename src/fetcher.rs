@@ -5,11 +5,15 @@ use std::path::PathBuf;
 use tracing::{info, warn};
 
 pub async fn load_oapi(link: &str) -> Result<OpenApiV3Spec, O2SError> {
-    if link.starts_with("http://") || link.starts_with("https://") {
+    if is_url(link) {
         load_http(link).await
     } else {
         load_file(link).await
     }
+}
+
+pub fn is_url(link: &str) -> bool {
+    link.starts_with("http://") || link.starts_with("https://")
 }
 
 async fn load_http(url: &str) -> Result<OpenApiV3Spec, O2SError> {
@@ -481,7 +485,8 @@ mod tests {
     #[test]
     fn exclusive_minimum_numeric_form_passes_through() {
         // Already OpenAPI 3.1 style; nothing to convert.
-        let input = json!({"schema": {"properties": {"age": {"type": "integer", "exclusiveMinimum": 5}}}});
+        let input =
+            json!({"schema": {"properties": {"age": {"type": "integer", "exclusiveMinimum": 5}}}});
         let out = sanitize_invalid_types(input);
         let age = &out["schema"]["properties"]["age"];
         assert_eq!(age.get("exclusiveMinimum"), Some(&json!(5)));

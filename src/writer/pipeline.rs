@@ -20,6 +20,7 @@ pub async fn openapi2skill(
     output_dir: Option<&Path>,
     force: bool,
     servers_override: Vec<String>,
+    source_url: Option<String>,
 ) -> Result<(), anyhow::Error> {
     let skill_name = infer_skill_name(&spec.info.title, output_dir);
     let dir: PathBuf = output_dir
@@ -39,6 +40,7 @@ pub async fn openapi2skill(
     let skill_writer = skill::Writer {
         name: skill_name,
         servers_override: servers_override.clone(),
+        source_url,
     };
     let endpoint_writer = endpoint::Writer { servers_override };
     let writers: &[&dyn CollectWrites] = &[
