@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-set -euo pipefail
+# set -euo pipefail
 
 ##############################################################
 # INSTALL KNOWN API SKILLS
-# 
+#
 # Install all the API skills from known_openapi.csv under
 # the .claude/skills directory.
 # ############################################################
@@ -14,7 +14,7 @@ CSV_FILE="$GIT_ROOT/known_openapi.csv"
 
 output_dir() {
     local name="$1"
-    echo "$GIT_ROOT/.claude/skills/api_$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+    echo "$GIT_ROOT/.claude/skills/$(echo "$name" | tr '[:upper:]' '[:lower:]')"
 }
 
 install_api() {
@@ -51,4 +51,17 @@ run_parallel() {
     done
 }
 
-run_parallel
+# run_parallel
+
+run() {
+    local -a names=() urls=() pids=()
+
+    parse_csv names urls
+
+    for i in "${!names[@]}"; do
+        echo Next is "${names[$i]}"
+        install_api "${names[$i]}" "${urls[$i]}"
+    done
+}
+
+run
