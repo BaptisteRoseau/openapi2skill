@@ -22,7 +22,6 @@ api-hashicorp-vault,https://raw.githubusercontent.com/hashicorp/vault-client-go/
 api-intercom,https://raw.githubusercontent.com/intercom/Intercom-OpenAPI/main/descriptions/2.15/api.intercom.io.yaml
 api-kubernetes,https://raw.githubusercontent.com/kubernetes/kubernetes/master/api/openapi-spec/v3/api__v1_openapi.json
 api-linode,https://raw.githubusercontent.com/linode/linode-api-docs/refs/heads/development/openapi.json
-api-mailchimp,https://raw.githubusercontent.com/mailchimp/mailchimp-client-lib-codegen/main/spec/marketing.json
 api-mailgun,https://documentation.mailgun.com/_spec/docs/mailgun/api-reference/send/mailgun.yaml?download
 api-microsoft-teams,https://raw.githubusercontent.com/microsoftgraph/msgraph-metadata/master/openapi/v1.0/openapi.yaml
 api-miro,https://raw.githubusercontent.com/miroapp/api-clients/main/packages/generator/spec.json
