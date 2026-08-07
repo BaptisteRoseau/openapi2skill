@@ -62,21 +62,14 @@ fn parse_unknown(content: &str) -> Option<Value> {
         .or_else(|| serde_yaml::from_str(content).ok())
 }
 
-/// Normalize spec fields for minor non-compliances encountered in real-world OpenAPI specs.
+/// Normalizes non-compliant fields found in real-world OpenAPI specs.
 ///
-/// Runs two passes in one tree walk, tracking whether we are inside a schema object:
-///
-/// - `"type": "any"` → drop (not a valid OpenAPI 3.x type).
-/// - `"any"` inside a `"type"` array → filtered out; field dropped if nothing remains.
-/// - `"required": <bool>` inside a schema body → drop. OpenAPI schemas require `required` to
-///   be a string array; some specs wrongly embed the parameter-level `required` flag inside
-///   the schema object itself (e.g. Spotify's `image/jpeg` upload schema).
-/// - `"description"` holding a non-string (e.g. Redocly's `{"$ref": "file.md#anchor"}` external
-///   description) → dropped, since we cannot resolve un-bundled external files.
-/// - `null` scopes list inside a `security` requirement → replaced with `[]`.
-/// - Non-absolute `url` inside `externalDocs`/`license`/`contact`, and non-absolute
-///   `termsOfService`/`authorizationUrl`/`tokenUrl`/`refreshUrl` → dropped, since oas3 requires
-///   these to be valid absolute URLs.
+/// - `type: "any"` / `"any"` in a type array -> dropped.
+/// - boolean `required` in a schema body -> dropped.
+/// - boolean `exclusiveMinimum`/`exclusiveMaximum` -> dropped.
+/// - non-string `description` -> dropped.
+/// - null security requirement scopes -> `[]`.
+/// - non-absolute `url`/`termsOfService`/`authorizationUrl`/`tokenUrl`/`refreshUrl` -> dropped.
 fn sanitize_invalid_types(value: Value) -> Value {
     sanitize(value, false)
 }
@@ -87,13 +80,7 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
             let mut out = serde_json::Map::with_capacity(map.len());
             for (k, v) in map {
                 match k.as_str() {
-                    // Arbitrary sample data (`Schema.example`/`.examples`/`.default`, and
-                    // `Example.value` nested one level under `examples`) is never itself an
-                    // OpenAPI construct, so it must be passed through untouched. Recursing into
-                    // it would otherwise let a sample payload that happens to reuse a keyword
-                    // like `type`, `required`, or `description` get mangled by the rules below
-                    // (e.g. Microsoft Graph's `microsoft.graph.educationRubric` example has a
-                    // `description` field whose sample value is itself an object).
+                    // Opaque sample data; left untouched.
                     "example" | "examples" | "default" => {
                         out.insert(k, v);
                     }
@@ -112,10 +99,7 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
                             out.insert(k, sanitize(v, false));
                         }
                     }
-                    // OpenAPI 3.0 used `exclusiveMinimum`/`exclusiveMaximum` as a boolean
-                    // modifier alongside `minimum`/`maximum` (JSON Schema draft-4 style); oas3
-                    // follows the OpenAPI 3.1 / JSON Schema 2020-12 meaning where the field
-                    // itself holds the exclusive numeric bound, so a boolean here is invalid.
+                    // OpenAPI 3.0 boolean form; oas3 expects a numeric bound.
                     "exclusiveMinimum" | "exclusiveMaximum" if in_schema => {
                         if matches!(v, Value::Bool(_)) {
                             warn!(
@@ -151,8 +135,7 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
                         };
                         out.insert(k, new_v);
                     }
-                    // `description` must be a string; some specs use a Redocly-style
-                    // `{"$ref": "file.md#anchor"}` object to pull it from an external file.
+                    // description must be a string here.
                     "description" => match v {
                         Value::String(_) => {
                             out.insert(k, v);
@@ -163,20 +146,17 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
                             );
                         }
                     },
-                    // A security requirement maps scheme name -> list of scopes; some specs send
-                    // `null` instead of `[]` for schemes that take no scopes.
+                    // null scopes -> empty array.
                     "security" => {
                         out.insert(k, sanitize_security_requirements(v));
                     }
-                    // `externalDocs.url` is a required, absolute-only field; drop the whole
-                    // object (rather than just `url`) when it can't be made valid, since a
-                    // present-but-empty `externalDocs` would still fail to deserialize.
+                    // url is required here; drop the whole object if invalid.
                     "externalDocs" => {
                         if let Some(sanitized) = sanitize_external_docs(v) {
                             out.insert(k, sanitized);
                         }
                     }
-                    // `url` is optional here, so dropping just that field keeps the rest valid.
+                    // url is optional here; just drop the field.
                     "license" | "contact" => {
                         out.insert(k, sanitize_url_field(v, "url"));
                     }
@@ -219,8 +199,7 @@ fn is_absolute_url(s: &str) -> bool {
     url::Url::parse(s).is_ok()
 }
 
-/// Drops an `externalDocs` object outright when its required `url` is missing or not a valid
-/// absolute URL, e.g. PayPal's `externalDocs: { url: "../doc/USERGUIDE.md" }`.
+/// Drops `externalDocs` when its `url` is missing or not absolute.
 fn sanitize_external_docs(value: Value) -> Option<Value> {
     match value {
         Value::Object(map) => match map.get("url") {
@@ -234,8 +213,7 @@ fn sanitize_external_docs(value: Value) -> Option<Value> {
     }
 }
 
-/// Drops `field` from `value` if present but not a valid absolute URL, e.g.
-/// PayPal's `externalDocs: { url: "../doc/USERGUIDE.md" }`.
+/// Drops `field` from `value` when it isn't a valid absolute URL.
 fn sanitize_url_field(value: Value, field: &str) -> Value {
     match value {
         Value::Object(mut map) => {

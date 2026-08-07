@@ -175,22 +175,14 @@ pub(crate) fn primary_type(ts: &SchemaTypeSet) -> SchemaType {
     }
 }
 
-/// Normalises a description string from a spec for use in markdown output.
-///
-/// Single `\n` inside descriptions is a soft wrap in the source spec but renders as a visible
-/// line break in raw-file readers (AI agents). Replacing every `\n` with a space keeps
-/// descriptions single-line and compact. Leading/trailing whitespace is also trimmed.
+/// Collapses newlines to spaces and trims a spec description for markdown output.
 pub(crate) fn normalize_desc(s: &str) -> String {
     let replaced = s.replace('\n', " ");
     replaced.trim().to_string()
 }
 
-/// Returns the base server URLs to use when rendering "Full URL" fields, each trimmed of a
-/// trailing slash.
-///
-/// The CLI `--server` override (`servers_override`) takes precedence over the spec's declared
-/// servers so that every endpoint file documents the host the agent will actually call. When no
-/// override is given, the spec's own servers are used.
+/// Returns the base server URLs for "Full URL" fields, trimmed of trailing slashes.
+/// Prefers `servers_override` over the spec's declared servers.
 pub(crate) fn effective_server_bases(
     spec: &OpenApiV3Spec,
     servers_override: &[String],

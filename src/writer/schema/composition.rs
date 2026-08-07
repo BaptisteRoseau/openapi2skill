@@ -3,12 +3,7 @@ use tracing::warn;
 
 use super::context::RenderCtx;
 
-/// Returns an effective [`ObjectSchema`] with every `allOf` subschema merged in.
-///
-/// Properties, `required`, and `schema_type` are inherited from subschemas when
-/// the outer schema does not already define them. The merge is recursive so a
-/// subschema's own `allOf` is also expanded. Cyclic `$ref`s in `allOf` are
-/// detected via [`RenderCtx::visiting`].
+/// Returns an effective [`ObjectSchema`] with every `allOf` subschema merged in, recursively.
 pub(super) fn merge_all_of(obj: &ObjectSchema, ctx: &mut RenderCtx<'_>) -> ObjectSchema {
     if obj.all_of.is_empty() {
         return obj.clone();
