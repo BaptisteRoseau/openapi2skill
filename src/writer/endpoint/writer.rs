@@ -8,7 +8,7 @@ use tracing::info;
 
 use super::{refs::collect_multi_use_schemas, render::render_endpoint};
 use crate::writer::utils::{
-    CollectWrites, category_label, effective_server_bases, op_category, path_to_slug,
+    CollectWrites, category_label, effective_server_bases, endpoint_filename, op_category,
 };
 
 pub(in crate::writer) struct Writer {
@@ -28,11 +28,7 @@ impl CollectWrites for Writer {
 
         for (path, method, op) in spec.operations() {
             let cat_slug = op_category(op, &path);
-            let filename = format!(
-                "{}-{}.md",
-                method.as_str().to_lowercase(),
-                path_to_slug(&path)
-            );
+            let filename = endpoint_filename(method.as_str(), &path);
             let summary = op.summary.as_deref().unwrap_or(path.as_str()).to_string();
             let content = render_endpoint(&path, method.as_str(), op, spec, &multi_use, &servers);
             let is_deprecated = op.deprecated == Some(true);

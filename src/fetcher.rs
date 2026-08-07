@@ -68,6 +68,12 @@ fn parse_unknown(content: &str) -> Option<Value> {
 /// - `"required": <bool>` inside a schema body → drop. OpenAPI schemas require `required` to
 ///   be a string array; some specs wrongly embed the parameter-level `required` flag inside
 ///   the schema object itself (e.g. Spotify's `image/jpeg` upload schema).
+/// - `"description"` holding a non-string (e.g. Redocly's `{"$ref": "file.md#anchor"}` external
+///   description) → dropped, since we cannot resolve un-bundled external files.
+/// - `null` scopes list inside a `security` requirement → replaced with `[]`.
+/// - Non-absolute `url` inside `externalDocs`/`license`/`contact`, and non-absolute
+///   `termsOfService`/`authorizationUrl`/`tokenUrl`/`refreshUrl` → dropped, since oas3 requires
+///   these to be valid absolute URLs.
 fn sanitize_invalid_types(value: Value) -> Value {
     sanitize(value, false)
 }
@@ -78,6 +84,16 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
             let mut out = serde_json::Map::with_capacity(map.len());
             for (k, v) in map {
                 match k.as_str() {
+                    // Arbitrary sample data (`Schema.example`/`.examples`/`.default`, and
+                    // `Example.value` nested one level under `examples`) is never itself an
+                    // OpenAPI construct, so it must be passed through untouched. Recursing into
+                    // it would otherwise let a sample payload that happens to reuse a keyword
+                    // like `type`, `required`, or `description` get mangled by the rules below
+                    // (e.g. Microsoft Graph's `microsoft.graph.educationRubric` example has a
+                    // `description` field whose sample value is itself an object).
+                    "example" | "examples" | "default" => {
+                        out.insert(k, v);
+                    }
                     "type" => {
                         if let Some(normalized) = normalize_type_value(&v) {
                             out.insert(k, normalized);
@@ -91,6 +107,19 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
                             );
                         } else {
                             out.insert(k, sanitize(v, false));
+                        }
+                    }
+                    // OpenAPI 3.0 used `exclusiveMinimum`/`exclusiveMaximum` as a boolean
+                    // modifier alongside `minimum`/`maximum` (JSON Schema draft-4 style); oas3
+                    // follows the OpenAPI 3.1 / JSON Schema 2020-12 meaning where the field
+                    // itself holds the exclusive numeric bound, so a boolean here is invalid.
+                    "exclusiveMinimum" | "exclusiveMaximum" if in_schema => {
+                        if matches!(v, Value::Bool(_)) {
+                            warn!(
+                                "Dropping boolean `{k}` inside schema body (OpenAPI 3.0 draft-4 style, not valid in OpenAPI 3.1 schemas)"
+                            );
+                        } else {
+                            out.insert(k, v);
                         }
                     }
                     // These keys always introduce a schema value.
@@ -119,6 +148,45 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
                         };
                         out.insert(k, new_v);
                     }
+                    // `description` must be a string; some specs use a Redocly-style
+                    // `{"$ref": "file.md#anchor"}` object to pull it from an external file.
+                    "description" => match v {
+                        Value::String(_) => {
+                            out.insert(k, v);
+                        }
+                        other => {
+                            warn!(
+                                "Dropping non-string `description` value (unsupported external reference): {other:?}"
+                            );
+                        }
+                    },
+                    // A security requirement maps scheme name -> list of scopes; some specs send
+                    // `null` instead of `[]` for schemes that take no scopes.
+                    "security" => {
+                        out.insert(k, sanitize_security_requirements(v));
+                    }
+                    // `externalDocs.url` is a required, absolute-only field; drop the whole
+                    // object (rather than just `url`) when it can't be made valid, since a
+                    // present-but-empty `externalDocs` would still fail to deserialize.
+                    "externalDocs" => {
+                        if let Some(sanitized) = sanitize_external_docs(v) {
+                            out.insert(k, sanitized);
+                        }
+                    }
+                    // `url` is optional here, so dropping just that field keeps the rest valid.
+                    "license" | "contact" => {
+                        out.insert(k, sanitize_url_field(v, "url"));
+                    }
+                    // Standalone fields that oas3 requires to be absolute URLs.
+                    "termsOfService" | "authorizationUrl" | "tokenUrl" | "refreshUrl" => {
+                        if let Value::String(s) = &v
+                            && !is_absolute_url(s)
+                        {
+                            warn!("Dropping non-absolute `{k}` value: {s:?}");
+                        } else {
+                            out.insert(k, v);
+                        }
+                    }
                     _ => {
                         out.insert(k, sanitize(v, in_schema));
                     }
@@ -138,6 +206,69 @@ fn sanitize_map_values(value: Value, in_schema: bool) -> Value {
         Value::Object(map) => Value::Object(
             map.into_iter()
                 .map(|(k, v)| (k, sanitize(v, in_schema)))
+                .collect(),
+        ),
+        other => other,
+    }
+}
+
+fn is_absolute_url(s: &str) -> bool {
+    url::Url::parse(s).is_ok()
+}
+
+/// Drops an `externalDocs` object outright when its required `url` is missing or not a valid
+/// absolute URL, e.g. PayPal's `externalDocs: { url: "../doc/USERGUIDE.md" }`.
+fn sanitize_external_docs(value: Value) -> Option<Value> {
+    match value {
+        Value::Object(map) => match map.get("url") {
+            Some(Value::String(s)) if is_absolute_url(s) => Some(Value::Object(map)),
+            other => {
+                warn!("Dropping `externalDocs` with missing/invalid absolute `url`: {other:?}");
+                None
+            }
+        },
+        other => Some(other),
+    }
+}
+
+/// Drops `field` from `value` if present but not a valid absolute URL, e.g.
+/// PayPal's `externalDocs: { url: "../doc/USERGUIDE.md" }`.
+fn sanitize_url_field(value: Value, field: &str) -> Value {
+    match value {
+        Value::Object(mut map) => {
+            if let Some(Value::String(s)) = map.get(field)
+                && !is_absolute_url(s)
+            {
+                warn!("Dropping non-absolute `{field}` value: {s:?}");
+                map.remove(field);
+            }
+            Value::Object(map)
+        }
+        other => other,
+    }
+}
+
+fn sanitize_security_requirements(value: Value) -> Value {
+    match value {
+        Value::Array(arr) => {
+            Value::Array(arr.into_iter().map(sanitize_security_requirement).collect())
+        }
+        other => other,
+    }
+}
+
+fn sanitize_security_requirement(req: Value) -> Value {
+    match req {
+        Value::Object(map) => Value::Object(
+            map.into_iter()
+                .map(|(scheme, scopes)| {
+                    if scopes.is_null() {
+                        warn!("Replacing null security scopes for `{scheme}` with an empty array");
+                        (scheme, Value::Array(Vec::new()))
+                    } else {
+                        (scheme, scopes)
+                    }
+                })
                 .collect(),
         ),
         other => other,

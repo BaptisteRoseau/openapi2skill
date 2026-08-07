@@ -130,6 +130,40 @@ pub(crate) fn path_to_slug(path: &str) -> String {
         .join("-")
 }
 
+const MAX_FILENAME_LEN: usize = 200;
+
+/// Builds the `{method}-{slug}.md` filename for an operation.
+/// Truncate filename exceeding the filesystem's max filename length.
+pub(crate) fn endpoint_filename(method: &str, path: &str) -> String {
+    let method = method.to_lowercase();
+    let slug = path_to_slug(path);
+    let filename = format!("{method}-{slug}.md");
+    if filename.len() <= MAX_FILENAME_LEN {
+        return filename;
+    }
+
+    let hash = format!("{:016x}", hash_str(path));
+    let fixed_len = method.len() + "--.md".len() + hash.len();
+    let budget = MAX_FILENAME_LEN.saturating_sub(fixed_len);
+    let truncated = truncate_at_char_boundary(&slug, budget);
+    format!("{method}-{truncated}-{hash}.md")
+}
+
+fn truncate_at_char_boundary(s: &str, max_len: usize) -> &str {
+    let mut end = max_len.min(s.len());
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    &s[..end]
+}
+
+fn hash_str(s: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    s.hash(&mut hasher);
+    hasher.finish()
+}
+
 pub(crate) fn primary_type(ts: &SchemaTypeSet) -> SchemaType {
     match ts {
         SchemaTypeSet::Single(t) => *t,

@@ -102,7 +102,10 @@ fn extract_jsonc_blocks(content: &str) -> Vec<String> {
 }
 
 fn assert_no_invalid_jsonc(dir: std::path::PathBuf) {
-    assert!(dir.is_dir());
+    // A spec with no component schemas produces no `schemas/` dir at all; nothing to check.
+    if !dir.is_dir() {
+        return;
+    }
     for entry in std::fs::read_dir(&dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -129,7 +132,10 @@ fn assert_no_invalid_jsonc(dir: std::path::PathBuf) {
 /// An empty `{}` jsonc block means the renderer dropped the schema's
 /// properties (e.g. failed to merge `allOf` composition).
 fn assert_no_empty_schema(dir: std::path::PathBuf) {
-    assert!(dir.is_dir());
+    // A spec with no component schemas produces no `schemas/` dir at all; nothing to check.
+    if !dir.is_dir() {
+        return;
+    }
     for entry in std::fs::read_dir(&dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
