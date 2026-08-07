@@ -28,10 +28,8 @@ pub(super) fn render_endpoint(
     out.push_str(&render_extensions_table(&op.extensions));
 
     let resolved_params = resolve_params(op, spec);
-    let query_params: Vec<_> = resolved_params
-        .iter()
-        .filter(|p| p.location == ParameterIn::Query)
-        .collect();
+    let path_params = params_in(&resolved_params, ParameterIn::Path);
+    let query_params = params_in(&resolved_params, ParameterIn::Query);
     let query_suffix = required_query_string(&query_params, spec);
 
     out.push_str(&render_info_table(
@@ -42,9 +40,19 @@ pub(super) fn render_endpoint(
         servers,
         &query_suffix,
     ));
-    out.push_str(&render_input_section(op, &resolved_params, spec, multi_use));
+    out.push_str(&render_input_section(
+        op,
+        &path_params,
+        &query_params,
+        spec,
+        multi_use,
+    ));
     out.push_str(&render_responses_section(op, spec, multi_use));
     out
+}
+
+fn params_in(params: &[Parameter], location: ParameterIn) -> Vec<&Parameter> {
+    params.iter().filter(|p| p.location == location).collect()
 }
 
 fn resolve_params(op: &Operation, spec: &OpenApiV3Spec) -> Vec<Parameter> {
@@ -65,26 +73,18 @@ fn resolve_params(op: &Operation, spec: &OpenApiV3Spec) -> Vec<Parameter> {
 
 fn render_input_section(
     op: &Operation,
-    resolved_params: &[Parameter],
+    path_params: &[&Parameter],
+    query_params: &[&Parameter],
     spec: &OpenApiV3Spec,
     multi_use: &HashSet<String>,
 ) -> String {
-    let path_params: Vec<_> = resolved_params
-        .iter()
-        .filter(|p| p.location == ParameterIn::Path)
-        .collect();
-    let query_params: Vec<_> = resolved_params
-        .iter()
-        .filter(|p| p.location == ParameterIn::Query)
-        .collect();
-
     if path_params.is_empty() && query_params.is_empty() && op.request_body.is_none() {
         return String::new();
     }
 
     let mut out = "## Input\n\n".to_string();
-    out.push_str(&render_path_params_table(&path_params, spec));
-    out.push_str(&render_query_params_table(&query_params, spec));
+    out.push_str(&render_path_params_table(path_params, spec));
+    out.push_str(&render_query_params_table(query_params, spec));
     out.push_str(&render_payload_section(op, spec, multi_use));
     out
 }
@@ -93,28 +93,27 @@ fn render_input_section(
 mod tests {
     use std::collections::HashSet;
 
+    use serde_json::json;
+
     use super::render_endpoint;
+    use crate::writer::testutil::{first_operation, spec_with_paths};
 
-    fn spec_without_deprecated() -> oas3::OpenApiV3Spec {
-        oas3::from_json(
-            r#"{"openapi":"3.0.0","info":{"title":"T","version":"1"},"paths":{"/test":{"get":{"responses":{"200":{"description":"OK"}}}}}}"#,
-        )
-        .unwrap()
-    }
-
-    fn spec_with_deprecated() -> oas3::OpenApiV3Spec {
-        oas3::from_json(
-            r#"{"openapi":"3.0.0","info":{"title":"T","version":"1"},"paths":{"/test":{"get":{"deprecated":true,"responses":{"200":{"description":"OK"}}}}}}"#,
-        )
-        .unwrap()
+    fn render_first(deprecated: bool) -> String {
+        let spec = spec_with_paths(json!({
+            "/test": {
+                "get": {
+                    "deprecated": deprecated,
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }));
+        let (path, method, op) = first_operation(&spec);
+        render_endpoint(&path, &method, &op, &spec, &HashSet::new(), &[])
     }
 
     #[test]
     fn non_deprecated_has_no_notice() {
-        let spec = spec_without_deprecated();
-        let ops: Vec<_> = spec.operations().collect();
-        let (path, method, op) = &ops[0];
-        let out = render_endpoint(path, method.as_str(), op, &spec, &HashSet::new(), &[]);
+        let out = render_first(false);
         assert!(
             !out.contains("Deprecated"),
             "should not contain Deprecated:\n{out}"
@@ -123,10 +122,7 @@ mod tests {
 
     #[test]
     fn deprecated_has_notice() {
-        let spec = spec_with_deprecated();
-        let ops: Vec<_> = spec.operations().collect();
-        let (path, method, op) = &ops[0];
-        let out = render_endpoint(path, method.as_str(), op, &spec, &HashSet::new(), &[]);
+        let out = render_first(true);
         assert!(
             out.contains("Deprecated"),
             "should contain Deprecated:\n{out}"

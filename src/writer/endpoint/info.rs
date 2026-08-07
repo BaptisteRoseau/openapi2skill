@@ -1,6 +1,8 @@
 use oas3::{OpenApiV3Spec, spec::Operation};
 use tracing::warn;
 
+use crate::writer::utils::Table;
+
 pub(super) fn render_info_table(
     path: &str,
     method: &str,
@@ -9,26 +11,20 @@ pub(super) fn render_info_table(
     servers: &[String],
     query_suffix: &str,
 ) -> String {
-    let mut out = "| | |\n|--|--|\n".to_string();
-    out.push_str(&format!("| **Method** | `{method}` |\n"));
-    out.push_str(&format!("| **URL** | `{path}` |\n"));
+    let mut table = Table::unlabeled(2);
+    table.row(&["**Method**", &format!("`{method}`")]);
+    table.row(&["**URL**", &format!("`{path}`")]);
     for base in servers {
-        out.push_str(&format!(
-            "| **Full URL** | `{base}{path}{query_suffix}` |\n"
-        ));
+        table.row(&["**Full URL**", &format!("`{base}{path}{query_suffix}`")]);
     }
-    out.push_str(&format!(
-        "| **Auth** | {} |\n",
-        render_security(&op.security, spec)
-    ));
+    table.row(&["**Auth**", &render_security(&op.security, spec)]);
     if let Some(ct) = render_content_type(method, op, spec) {
-        out.push_str(&format!("| **Request Content-Type** | {ct} |\n"));
+        table.row(&["**Request Content-Type**", &ct]);
     }
     if let Some(docs) = &op.external_docs {
-        out.push_str(&format!("| **Docs** | {} |\n", render_external_docs(docs)));
+        table.row(&["**Docs**", &render_external_docs(docs)]);
     }
-    out.push('\n');
-    out
+    table.finish()
 }
 
 fn render_external_docs(docs: &oas3::spec::ExternalDoc) -> String {
@@ -98,13 +94,26 @@ fn format_security_scheme(scheme: &str, scopes: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::render_info_table;
+    use crate::writer::testutil::{first_operation, spec_from, spec_with_paths};
+
+    fn get_query_op(extra: serde_json::Value) -> serde_json::Value {
+        let mut op = json!({"responses": {"200": {"description": "OK"}}});
+        if let (Some(target), Some(extra)) = (op.as_object_mut(), extra.as_object()) {
+            for (key, value) in extra {
+                target.insert(key.clone(), value.clone());
+            }
+        }
+        json!({"/query": {"get": op}})
+    }
 
     fn spec_with_operation(server_url: &str) -> oas3::OpenApiV3Spec {
-        let json = format!(
-            r#"{{"openapi":"3.0.0","info":{{"title":"T","version":"1"}},"servers":[{{"url":"{server_url}"}}],"paths":{{"/query":{{"get":{{"responses":{{"200":{{"description":"OK"}}}}}}}}}}}}"#
-        );
-        oas3::from_json(json).unwrap()
+        spec_from(json!({
+            "servers": [{"url": server_url}],
+            "paths": get_query_op(json!({})),
+        }))
     }
 
     fn render(spec: &oas3::OpenApiV3Spec, servers: &[String]) -> String {
@@ -116,9 +125,8 @@ mod tests {
         servers: &[String],
         query_suffix: &str,
     ) -> String {
-        let ops: Vec<_> = spec.operations().collect();
-        let (path, method, op) = &ops[0];
-        render_info_table(path, method.as_str(), op, spec, servers, query_suffix)
+        let (path, method, op) = first_operation(spec);
+        render_info_table(&path, &method, &op, spec, servers, query_suffix)
     }
 
     #[test]
@@ -204,11 +212,9 @@ mod tests {
 
     #[test]
     fn docs_row_renders_link_with_description() {
-        let json = r#"{"openapi":"3.0.0","info":{"title":"T","version":"1"},"paths":{"/query":{"get":{
-            "externalDocs":{"url":"https://docs.example.com/query","description":"More info"},
-            "responses":{"200":{"description":"OK"}}
-        }}}}"#;
-        let spec: oas3::OpenApiV3Spec = oas3::from_json(json).unwrap();
+        let spec = spec_with_paths(get_query_op(json!({
+            "externalDocs": {"url": "https://docs.example.com/query", "description": "More info"}
+        })));
         let out = render(&spec, &[]);
         assert!(
             out.contains("| **Docs** | [More info](https://docs.example.com/query) |"),
@@ -218,11 +224,9 @@ mod tests {
 
     #[test]
     fn docs_row_renders_bare_url_without_description() {
-        let json = r#"{"openapi":"3.0.0","info":{"title":"T","version":"1"},"paths":{"/query":{"get":{
-            "externalDocs":{"url":"https://docs.example.com/query"},
-            "responses":{"200":{"description":"OK"}}
-        }}}}"#;
-        let spec: oas3::OpenApiV3Spec = oas3::from_json(json).unwrap();
+        let spec = spec_with_paths(get_query_op(json!({
+            "externalDocs": {"url": "https://docs.example.com/query"}
+        })));
         let out = render(&spec, &[]);
         assert!(
             out.contains("| **Docs** | https://docs.example.com/query |"),

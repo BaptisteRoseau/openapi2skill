@@ -8,6 +8,8 @@ mod manifest;
 mod pipeline;
 mod schema;
 mod skill;
+#[cfg(test)]
+mod testutil;
 pub(crate) mod utils;
 
 pub use pipeline::{GenerationContext, openapi2skill};

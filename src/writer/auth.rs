@@ -33,25 +33,20 @@
 //! Authorization: Basic <base64(username:password)>
 //! ```
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use oas3::{
     OpenApiV3Spec,
     spec::{Flows, ObjectOrReference, SecurityScheme},
 };
-use tracing::{info, warn};
+use tracing::warn;
 
-use super::utils::{CollectWrites, build_index, normalize_desc};
+use super::utils::{CollectWrites, Table, Writes, build_index, desc_cell, desc_paragraph};
 
 pub(super) struct Writer;
 
 impl CollectWrites for Writer {
-    fn collect_writes(
-        &self,
-        spec: &OpenApiV3Spec,
-        dir: &Path,
-        writes: &mut Vec<(PathBuf, String)>,
-    ) {
+    fn collect_writes(&self, spec: &OpenApiV3Spec, dir: &Path, writes: &mut Writes) {
         let Some(components) = &spec.components else {
             return;
         };
@@ -63,28 +58,19 @@ impl CollectWrites for Writer {
         let mut index_links: Vec<(String, String)> = Vec::new();
 
         for (name, scheme_ref) in &components.security_schemes {
-            let scheme = match scheme_ref {
-                ObjectOrReference::Object(s) => s,
-                ObjectOrReference::Ref { ref_path, .. } => {
-                    warn!(
-                        scheme = name,
-                        ref_path = %ref_path,
-                        "security scheme is a $ref; skipping (refs to other schemes are not supported)"
-                    );
-                    continue;
-                }
+            let ObjectOrReference::Object(scheme) = scheme_ref else {
+                warn!(
+                    scheme = name,
+                    "security scheme is a $ref; skipping (refs to other schemes are not supported)"
+                );
+                continue;
             };
             let filename = format!("{}.md", name.to_lowercase().replace(' ', "-"));
-            let content = render_scheme(name, scheme);
-            let write_path = (auth_dir.join(&filename), content);
-            info!("Writing {:?}", write_path.0);
-            writes.push(write_path);
+            writes.push(auth_dir.join(&filename), render_scheme(name, scheme));
             index_links.push((filename, name.clone()));
         }
 
-        let write_path = (auth_dir.join("index.md"), build_index(&index_links));
-        info!("Writing {:?}", write_path.0);
-        writes.push(write_path);
+        writes.push(auth_dir.join("index.md"), build_index(&index_links));
     }
 }
 
@@ -96,8 +82,13 @@ fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
             location,
         } => {
             let mut out = render_header(name, description.as_deref());
+            out.push_str("Add the following header to every request:\n\n");
+            let mut table = Table::new(&["Header", "Value"]);
+            table.row(&[format!("`{header_name}`"), "Your API key".to_string()]);
+            out.push_str(&table.finish());
             out.push_str(&format!(
-                "Add the following header to every request:\n\n| Header | Value |\n|--------|-------|\n| `{header_name}` | Your API key |\n\nLocation: `{location}`\n\n```http\nGET /example HTTP/1.1\n{header_name}: your-key-here\n```\n"
+                "Location: `{location}`\n\n{}\n",
+                http_example(&format!("{header_name}: your-key-here"))
             ));
             out
         }
@@ -119,7 +110,8 @@ fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
                 _ => "<credentials>",
             };
             out.push_str(&format!(
-                "HTTP `{scheme}` authentication{format_hint}.\n\n```http\nGET /example HTTP/1.1\nAuthorization: {scheme_header} {placeholder}\n```\n"
+                "HTTP `{scheme}` authentication{format_hint}.\n\n{}\n",
+                http_example(&format!("Authorization: {scheme_header} {placeholder}"))
             ));
             out
         }
@@ -128,9 +120,10 @@ fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
             let mut out = render_header(name, description.as_deref());
             out.push_str("OAuth 2.0 authentication.\n\n");
             out.push_str(&render_flows(flows));
-            out.push_str(
-                "\n```http\nGET /example HTTP/1.1\nAuthorization: Bearer <access_token>\n```\n",
-            );
+            out.push_str(&format!(
+                "\n{}\n",
+                http_example("Authorization: Bearer <access_token>")
+            ));
             out
         }
 
@@ -154,12 +147,11 @@ fn render_scheme(name: &str, scheme: &SecurityScheme) -> String {
 }
 
 fn render_header(name: &str, description: Option<&str>) -> String {
-    let mut out = format!("# {name}\n\n");
-    if let Some(desc) = description.map(normalize_desc).filter(|d| !d.is_empty()) {
-        out.push_str(&desc);
-        out.push_str("\n\n");
-    }
-    out
+    format!("# {name}\n\n{}", desc_paragraph(description))
+}
+
+fn http_example(auth_line: &str) -> String {
+    format!("```http\nGET /example HTTP/1.1\n{auth_line}\n```")
 }
 
 fn capitalize_first(s: &str) -> String {
@@ -172,30 +164,43 @@ fn capitalize_first(s: &str) -> String {
 
 fn render_flows(flows: &Flows) -> String {
     let mut out = String::new();
-
     if let Some(f) = &flows.implicit {
-        out.push_str(&format!(
-            "**Authorization URL:** `{}`\n\n",
-            f.authorization_url
+        out.push_str(&render_flow(
+            &[("Authorization URL", f.authorization_url.to_string())],
+            &f.scopes,
         ));
-        out.push_str(&render_scopes(&f.scopes));
     }
     if let Some(f) = &flows.password {
-        out.push_str(&format!("**Token URL:** `{}`\n\n", f.token_url));
-        out.push_str(&render_scopes(&f.scopes));
+        out.push_str(&render_flow(
+            &[("Token URL", f.token_url.to_string())],
+            &f.scopes,
+        ));
     }
     if let Some(f) = &flows.client_credentials {
-        out.push_str(&format!("**Token URL:** `{}`\n\n", f.token_url));
-        out.push_str(&render_scopes(&f.scopes));
+        out.push_str(&render_flow(
+            &[("Token URL", f.token_url.to_string())],
+            &f.scopes,
+        ));
     }
     if let Some(f) = &flows.authorization_code {
-        out.push_str(&format!(
-            "**Authorization URL:** `{}`\n**Token URL:** `{}`\n\n",
-            f.authorization_url, f.token_url
+        out.push_str(&render_flow(
+            &[
+                ("Authorization URL", f.authorization_url.to_string()),
+                ("Token URL", f.token_url.to_string()),
+            ],
+            &f.scopes,
         ));
-        out.push_str(&render_scopes(&f.scopes));
     }
+    out
+}
 
+fn render_flow(urls: &[(&str, String)], scopes: &oas3::Map<String, String>) -> String {
+    let mut out = String::new();
+    for (label, url) in urls {
+        out.push_str(&format!("**{label}:** `{url}`\n"));
+    }
+    out.push('\n');
+    out.push_str(&render_scopes(scopes));
     out
 }
 
@@ -203,10 +208,9 @@ fn render_scopes(scopes: &oas3::Map<String, String>) -> String {
     if scopes.is_empty() {
         return String::new();
     }
-    let mut out = "**Scopes:**\n\n| Scope | Description |\n|-------|-------------|\n".to_string();
+    let mut table = Table::new(&["Scope", "Description"]);
     for (scope, desc) in scopes {
-        out.push_str(&format!("| `{scope}` | {} |\n", normalize_desc(desc)));
+        table.row(&[format!("`{scope}`"), desc_cell(Some(desc))]);
     }
-    out.push('\n');
-    out
+    format!("**Scopes:**\n\n{}", table.finish())
 }

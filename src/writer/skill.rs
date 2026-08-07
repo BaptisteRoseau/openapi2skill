@@ -47,12 +47,12 @@
 //! navigate this API: the indexed markdown files above contain the same information organized
 //! for far fewer tokens.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use oas3::OpenApiV3Spec;
-use tracing::info;
+use url::Url;
 
-use super::utils::{CollectWrites, category_label, op_category};
+use super::utils::{CollectWrites, Writes};
 
 pub(super) struct Writer {
     pub(super) name: String,
@@ -63,50 +63,32 @@ pub(super) struct Writer {
 }
 
 impl CollectWrites for Writer {
-    fn collect_writes(
-        &self,
-        spec: &OpenApiV3Spec,
-        dir: &Path,
-        writes: &mut Vec<(PathBuf, String)>,
-    ) {
-        let write_path = (
-            dir.join("SKILL.md"),
-            render(
-                spec,
-                &self.name,
-                &self.servers_override,
-                self.source_url.as_deref(),
-                &self.manifest_filename,
-                &self.command,
-            ),
-        );
-        info!("Writing {:?}", write_path.0);
-        writes.push(write_path);
+    fn collect_writes(&self, spec: &OpenApiV3Spec, dir: &Path, writes: &mut Writes) {
+        writes.push(dir.join("SKILL.md"), self.render(spec));
     }
 }
 
-fn render(
-    spec: &OpenApiV3Spec,
-    name: &str,
-    servers_override: &[String],
-    source_url: Option<&str>,
-    manifest_filename: &str,
-    command: &str,
-) -> String {
-    let title = &spec.info.title;
-    let description = spec.info.description.as_deref().unwrap_or("");
+impl Writer {
+    fn render(&self, spec: &OpenApiV3Spec) -> String {
+        let title = &spec.info.title;
+        let description = spec.info.description.as_deref().unwrap_or("");
+        let source_url = self.source_url.as_deref();
 
-    let mut out = render_skill_header(name, title);
-    out.push_str(&render_metadata(
-        spec,
-        servers_override,
-        source_url,
-        command,
-    ));
-    out.push_str(&render_decription_and_navigation(description, spec));
-    out.push_str(&render_index(spec));
-    out.push_str(&render_manifest_section(manifest_filename, source_url));
-    out
+        let mut out = render_skill_header(&self.name, title);
+        out.push_str(&render_metadata(
+            spec,
+            &self.servers_override,
+            source_url,
+            &self.command,
+        ));
+        out.push_str(&render_decription_and_navigation(description, spec));
+        out.push_str(&render_index(spec));
+        out.push_str(&render_manifest_section(
+            &self.manifest_filename,
+            source_url,
+        ));
+        out
+    }
 }
 
 fn render_skill_header(name: &str, title: &str) -> String {
@@ -121,52 +103,69 @@ fn render_metadata(
     source_url: Option<&str>,
     command: &str,
 ) -> String {
-    let mut out = format!("**Version:** {}", spec.info.version);
+    let mut out = render_version_line(spec);
+    if let Some(url) = source_url {
+        out.push_str(&format!("**Source:** {url}\n\n"));
+    }
+    out.push_str(&format!("**Generated with:** `{command}`\n\n"));
+    out.push_str(&render_servers_section(spec, servers_override));
+    if let Some(ext) = &spec.external_docs {
+        out.push_str(&format!(
+            "**External Docs:** {}\n\n",
+            labelled_link(ext.description.as_deref(), ext.url.as_str())
+        ));
+    }
+    out
+}
 
+fn render_version_line(spec: &OpenApiV3Spec) -> String {
+    let mut out = format!("**Version:** {}", spec.info.version);
     if let Some(license) = &spec.info.license {
-        if let Some(url) = &license.url {
-            out.push_str(&format!(" | **License:** [{}]({})", license.name, url));
-        } else {
-            out.push_str(&format!(" | **License:** {}", license.name));
-        }
+        let url = license.url.as_ref().map(Url::to_string).unwrap_or_default();
+        out.push_str(&format!(
+            " | **License:** {}",
+            labelled_link(Some(&license.name), &url)
+        ));
     }
     if let Some(tos) = &spec.info.terms_of_service {
         out.push_str(&format!(" | **Terms of Service:** {tos}"));
     }
     out.push_str("\n\n");
+    out
+}
 
-    if let Some(url) = source_url {
-        out.push_str(&format!("**Source:** {url}\n\n"));
+/// A markdown link when both parts are present, otherwise whichever one is.
+fn labelled_link(label: Option<&str>, url: &str) -> String {
+    match label {
+        Some(label) if url.is_empty() => label.to_string(),
+        Some(label) => format!("[{label}]({url})"),
+        None => url.to_string(),
     }
+}
 
-    out.push_str(&format!("**Generated with:** `{command}`\n\n"));
-
-    if !servers_override.is_empty() {
-        out.push_str("**Servers:**\n");
-        for url in servers_override {
-            out.push_str(&format!("- {url}\n"));
-        }
-        out.push('\n');
-    } else if !spec.servers.is_empty() {
-        out.push_str("**Servers:**\n");
-        for server in &spec.servers {
-            if let Some(desc) = &server.description {
-                out.push_str(&format!("- {} — {}\n", server.url, desc));
-            } else {
-                out.push_str(&format!("- {}\n", server.url));
-            }
-        }
-        out.push('\n');
+fn render_servers_section(spec: &OpenApiV3Spec, servers_override: &[String]) -> String {
+    let entries: Vec<(&str, Option<&str>)> = if servers_override.is_empty() {
+        spec.servers
+            .iter()
+            .map(|s| (s.url.as_str(), s.description.as_deref()))
+            .collect()
+    } else {
+        servers_override
+            .iter()
+            .map(|url| (url.as_str(), None))
+            .collect()
+    };
+    if entries.is_empty() {
+        return String::new();
     }
-
-    if let Some(ext) = &spec.external_docs {
-        if let Some(desc) = &ext.description {
-            out.push_str(&format!("**External Docs:** [{desc}]({})\n\n", ext.url));
-        } else {
-            out.push_str(&format!("**External Docs:** {}\n\n", ext.url));
+    let mut out = "**Servers:**\n".to_string();
+    for (url, description) in entries {
+        match description {
+            Some(desc) => out.push_str(&format!("- {url} — {desc}\n")),
+            None => out.push_str(&format!("- {url}\n")),
         }
     }
-
+    out.push('\n');
     out
 }
 
@@ -188,26 +187,9 @@ fn render_decription_and_navigation(description: &str, spec: &OpenApiV3Spec) -> 
 }
 
 fn render_index(spec: &OpenApiV3Spec) -> String {
-    let has_auth = spec
-        .components
-        .as_ref()
-        .map(|c| !c.security_schemes.is_empty())
-        .unwrap_or(false);
-
-    let has_schemas = spec
-        .components
-        .as_ref()
-        .map(|c| !c.schemas.is_empty())
-        .unwrap_or(false);
-
-    let mut categories: Vec<(String, String)> = Vec::new();
-    for (path, _, op) in spec.operations() {
-        let slug = op_category(op, &path);
-        if !categories.iter().any(|(s, _)| s == &slug) {
-            let desc = category_label(&slug);
-            categories.push((slug, desc));
-        }
-    }
+    let has_auth = has_components(spec, |c| !c.security_schemes.is_empty());
+    let has_schemas = has_components(spec, |c| !c.schemas.is_empty());
+    let has_endpoints = spec.operations().next().is_some();
 
     let mut out = "Read the following files depending on your current needs:\n\n".to_string();
     if has_auth {
@@ -215,13 +197,17 @@ fn render_index(spec: &OpenApiV3Spec) -> String {
             "- [authentication/index.md](./authentication/index.md): Authentication workflows\n",
         );
     }
-    if !categories.is_empty() {
+    if has_endpoints {
         out.push_str("- [endpoints/index.md](./endpoints/index.md): API endpoints\n");
     }
     if has_schemas {
         out.push_str("- [schemas/index.md](./schemas/index.md): Data schemas, only if you need them alone. They are already included in endpoints.\n");
     }
     out
+}
+
+fn has_components(spec: &OpenApiV3Spec, predicate: fn(&oas3::spec::Components) -> bool) -> bool {
+    spec.components.as_ref().map(predicate).unwrap_or(false)
 }
 
 fn render_manifest_section(manifest_filename: &str, source_url: Option<&str>) -> String {
@@ -239,25 +225,15 @@ fn render_manifest_section(manifest_filename: &str, source_url: Option<&str>) ->
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use serde_json::json;
 
-    fn minimal_spec(server_urls: &[&str]) -> OpenApiV3Spec {
-        let servers_json: String = server_urls
-            .iter()
-            .map(|u| format!(r#"{{"url":"{u}"}}"#))
-            .collect::<Vec<_>>()
-            .join(",");
-        let json = format!(
-            r#"{{"openapi":"3.0.0","info":{{"title":"Test API","version":"1.0.0"}},"servers":[{servers_json}],"paths":{{}}}}"#
-        );
-        oas3::from_json(json).unwrap()
-    }
+    use super::*;
+    use crate::writer::testutil::{spec_with_paths, spec_with_servers as minimal_spec};
 
     fn minimal_spec_with_deprecated() -> OpenApiV3Spec {
-        oas3::from_json(
-            r#"{"openapi":"3.0.0","info":{"title":"Test API","version":"1.0.0"},"paths":{"/test":{"get":{"deprecated":true,"responses":{"200":{"description":"OK"}}}}}}"#,
-        )
-        .unwrap()
+        spec_with_paths(json!({
+            "/test": {"get": {"deprecated": true, "responses": {"200": {"description": "OK"}}}}
+        }))
     }
 
     #[test]

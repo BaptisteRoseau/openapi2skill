@@ -1,13 +1,15 @@
 use oas3::spec::{ObjectSchema, SchemaType, SchemaTypeSet};
 
-use crate::writer::utils::{normalize_desc, primary_type};
+use crate::writer::utils::{bare_type_name, normalize_desc, primary_type, type_label};
 
 pub(super) fn primitive_type_name(obj: &ObjectSchema) -> String {
     match obj.schema_type.as_ref().map(primary_type) {
-        Some(SchemaType::String) => "string".to_string(),
-        Some(SchemaType::Integer) => "integer".to_string(),
-        Some(SchemaType::Number) => "number".to_string(),
-        Some(SchemaType::Boolean) => "boolean".to_string(),
+        Some(
+            t @ (SchemaType::String
+            | SchemaType::Integer
+            | SchemaType::Number
+            | SchemaType::Boolean),
+        ) => bare_type_name(t).to_string(),
         _ => "object".to_string(),
     }
 }
@@ -40,7 +42,7 @@ pub(super) fn primitive_example(obj: &ObjectSchema) -> String {
 pub(super) fn type_comment(obj: &ObjectSchema, req: &str) -> String {
     let ts = obj.schema_type.as_ref();
     let fmt = obj.format.as_deref();
-    let mut parts = vec![type_label(ts, fmt)];
+    let mut parts = vec![type_label(ts, fmt, |t| t == SchemaType::Integer)];
     let is_single_integer = matches!(ts, Some(SchemaTypeSet::Single(SchemaType::Integer)));
     if let Some(f) = fmt
         && !is_single_integer
@@ -70,66 +72,30 @@ pub(super) fn type_comment(obj: &ObjectSchema, req: &str) -> String {
     parts.join(", ")
 }
 
-fn type_label(ts: Option<&SchemaTypeSet>, fmt: Option<&str>) -> String {
-    match ts {
-        None => "any".to_string(),
-        Some(SchemaTypeSet::Single(t)) => single_type_label(*t, fmt),
-        Some(SchemaTypeSet::Multiple(types)) => {
-            let inner: Vec<String> = types.iter().copied().map(bare_type_name).collect();
-            format!("array[{}]", inner.join(", "))
-        }
-    }
-}
-
-fn single_type_label(t: SchemaType, fmt: Option<&str>) -> String {
-    match t {
-        SchemaType::Integer => fmt
-            .map(|f| format!("integer ({f})"))
-            .unwrap_or_else(|| "integer".to_string()),
-        _ => bare_type_name(t),
-    }
-}
-
-fn bare_type_name(t: SchemaType) -> String {
-    match t {
-        SchemaType::Integer => "integer".to_string(),
-        SchemaType::Number => "number".to_string(),
-        SchemaType::Boolean => "boolean".to_string(),
-        SchemaType::String => "string".to_string(),
-        SchemaType::Array => "array".to_string(),
-        SchemaType::Object => "object".to_string(),
-        SchemaType::Null => "null".to_string(),
-    }
-}
-
 pub(super) fn collect_type_constraints(obj: &ObjectSchema) -> Vec<String> {
     let mut parts = Vec::new();
-    if let Some(min) = &obj.minimum {
-        parts.push(format!("min: {min}"));
+    for (label, value) in [
+        ("min", obj.minimum.as_ref()),
+        ("xmin", obj.exclusive_minimum.as_ref()),
+        ("max", obj.maximum.as_ref()),
+        ("xmax", obj.exclusive_maximum.as_ref()),
+    ] {
+        if let Some(value) = value {
+            parts.push(format!("{label}: {value}"));
+        }
     }
-    if let Some(xmin) = &obj.exclusive_minimum {
-        parts.push(format!("xmin: {xmin}"));
-    }
-    if let Some(max) = &obj.maximum {
-        parts.push(format!("max: {max}"));
-    }
-    if let Some(xmax) = &obj.exclusive_maximum {
-        parts.push(format!("xmax: {xmax}"));
-    }
-    if let Some(min_len) = obj.min_length {
-        parts.push(format!("minLength: {min_len}"));
-    }
-    if let Some(max_len) = obj.max_length {
-        parts.push(format!("maxLength: {max_len}"));
+    for (label, value) in [("minLength", obj.min_length), ("maxLength", obj.max_length)] {
+        if let Some(value) = value {
+            parts.push(format!("{label}: {value}"));
+        }
     }
     if let Some(pat) = &obj.pattern {
         parts.push(format!("pattern: \"{pat}\""));
     }
-    if let Some(min_items) = obj.min_items {
-        parts.push(format!("minItems: {min_items}"));
-    }
-    if let Some(max_items) = obj.max_items {
-        parts.push(format!("maxItems: {max_items}"));
+    for (label, value) in [("minItems", obj.min_items), ("maxItems", obj.max_items)] {
+        if let Some(value) = value {
+            parts.push(format!("{label}: {value}"));
+        }
     }
     parts
 }
@@ -137,11 +103,8 @@ pub(super) fn collect_type_constraints(obj: &ObjectSchema) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::writer::testutil::object_schema as obj;
     use serde_json::json;
-
-    fn obj(v: serde_json::Value) -> ObjectSchema {
-        serde_json::from_value(v).unwrap()
-    }
 
     // --- collect_type_constraints ---
 

@@ -4,6 +4,8 @@ use oas3::{
 };
 use tracing::warn;
 
+use crate::writer::utils::{Table, desc_cell};
+
 pub(super) fn render_response_links_table(
     links: &Map<String, ObjectOrReference<Link>>,
     spec: &OpenApiV3Spec,
@@ -11,18 +13,15 @@ pub(super) fn render_response_links_table(
     if links.is_empty() {
         return String::new();
     }
-    let mut out =
-        "### Links\n\n| Link | Operation | Parameters | Description |\n|------|-----------|------------|-------------|\n"
-            .to_string();
+    let mut table = Table::new(&["Link", "Operation", "Parameters", "Description"]);
     for (name, link_ref) in links {
         let Some(link) = resolve_link(link_ref, spec) else {
             warn!(link = %name, "could not resolve response link; skipping");
             continue;
         };
-        out.push_str(&render_link_row(name, &link));
+        table.row(&link_row_cells(name, &link));
     }
-    out.push('\n');
-    out
+    format!("### Links\n\n{}", table.finish())
 }
 
 fn resolve_link(link_ref: &ObjectOrReference<Link>, spec: &OpenApiV3Spec) -> Option<Link> {
@@ -39,7 +38,7 @@ fn resolve_link(link_ref: &ObjectOrReference<Link>, spec: &OpenApiV3Spec) -> Opt
     }
 }
 
-fn render_link_row(name: &str, link: &Link) -> String {
+fn link_row_cells(name: &str, link: &Link) -> [String; 4] {
     let (operation, parameters, description) = match link {
         Link::Id {
             operation_id,
@@ -54,7 +53,7 @@ fn render_link_row(name: &str, link: &Link) -> String {
             ..
         } => (operation_ref.as_str(), parameters, description.as_deref()),
     };
-    let params_str = if parameters.is_empty() {
+    let params = if parameters.is_empty() {
         "-".to_string()
     } else {
         parameters
@@ -63,13 +62,12 @@ fn render_link_row(name: &str, link: &Link) -> String {
             .collect::<Vec<_>>()
             .join(", ")
     };
-    format!(
-        "| `{}` | `{}` | {} | {} |\n",
-        name,
-        operation,
-        params_str,
-        description.unwrap_or("-"),
-    )
+    [
+        format!("`{name}`"),
+        format!("`{operation}`"),
+        params,
+        desc_cell(description),
+    ]
 }
 
 #[cfg(test)]
@@ -77,11 +75,7 @@ mod tests {
     use oas3::spec::{Link, ObjectOrReference};
 
     use super::*;
-
-    fn empty_spec() -> OpenApiV3Spec {
-        oas3::from_json(r#"{"openapi":"3.1.0","info":{"title":"Test","version":"1.0"},"paths":{}}"#)
-            .unwrap()
-    }
+    use crate::writer::testutil::empty_spec;
 
     #[test]
     fn empty_links_returns_empty_string() {

@@ -2,6 +2,7 @@ use oas3::spec::{ObjectOrReference, ObjectSchema, Schema};
 use tracing::warn;
 
 use super::context::RenderCtx;
+use crate::writer::utils::schema_ref_name;
 
 /// Returns an effective [`ObjectSchema`] with every `allOf` subschema merged in, recursively.
 pub(super) fn merge_all_of(obj: &ObjectSchema, ctx: &mut RenderCtx<'_>) -> ObjectSchema {
@@ -17,7 +18,7 @@ pub(super) fn merge_all_of(obj: &ObjectSchema, ctx: &mut RenderCtx<'_>) -> Objec
 }
 
 fn merge_subschema_into(merged: &mut ObjectSchema, sub: &Schema, ctx: &mut RenderCtx<'_>) {
-    let pushed = subschema_ref_name(sub).map(str::to_string);
+    let pushed = schema_ref_name(sub).map(str::to_string);
     if let Some(name) = &pushed {
         if ctx.visiting.contains(name) {
             return;
@@ -66,41 +67,21 @@ fn merge_subschema_into(merged: &mut ObjectSchema, sub: &Schema, ctx: &mut Rende
     }
 }
 
-fn subschema_ref_name(schema: &Schema) -> Option<&str> {
-    let Schema::Object(oor) = schema else {
-        return None;
-    };
-    let ObjectOrReference::Ref { ref_path, .. } = oor.as_ref() else {
-        return None;
-    };
-    ref_path.strip_prefix("#/components/schemas/")
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 
     use oas3::OpenApiV3Spec;
+    use serde_json::json;
 
     use super::*;
+    use crate::writer::testutil::{object_schema, spec_with_schemas};
 
-    fn spec_with_components(components_json: serde_json::Value) -> OpenApiV3Spec {
-        let spec = serde_json::json!({
-            "openapi": "3.0.0",
-            "info": {"title": "t", "version": "1"},
-            "paths": {},
-            "components": components_json,
-        });
-        oas3::from_json(spec.to_string()).expect("valid spec")
-    }
-
-    fn merge<'a>(obj: &ObjectSchema, spec: &'a OpenApiV3Spec) -> ObjectSchema {
-        let multi_use: HashSet<String> = HashSet::new();
-        // Leak so we keep the borrow alive for the test lifetime.
-        let multi_use: &'a HashSet<String> = Box::leak(Box::new(multi_use));
+    fn merge(obj: &ObjectSchema, spec: &OpenApiV3Spec) -> ObjectSchema {
+        let multi_use = HashSet::new();
         let mut ctx = RenderCtx {
             spec,
-            multi_use,
+            multi_use: &multi_use,
             visiting: HashSet::new(),
         };
         merge_all_of(obj, &mut ctx)
@@ -108,13 +89,12 @@ mod tests {
 
     #[test]
     fn passthrough_when_no_all_of() {
-        let spec = spec_with_components(serde_json::json!({"schemas": {}}));
-        let obj: ObjectSchema = serde_json::from_value(serde_json::json!({
+        let spec = spec_with_schemas(json!({}));
+        let obj = object_schema(json!({
             "type": "object",
             "properties": {"name": {"type": "string"}},
             "required": ["name"],
-        }))
-        .unwrap();
+        }));
         let merged = merge(&obj, &spec);
         assert!(merged.properties.contains_key("name"));
         assert_eq!(merged.required, vec!["name".to_string()]);
@@ -122,15 +102,14 @@ mod tests {
 
     #[test]
     fn merges_properties_from_inline_all_of() {
-        let spec = spec_with_components(serde_json::json!({"schemas": {}}));
-        let obj: ObjectSchema = serde_json::from_value(serde_json::json!({
+        let spec = spec_with_schemas(json!({}));
+        let obj = object_schema(json!({
             "type": "object",
             "allOf": [
                 {"type": "object", "properties": {"a": {"type": "string"}}, "required": ["a"]},
                 {"type": "object", "properties": {"b": {"type": "integer"}}},
             ],
-        }))
-        .unwrap();
+        }));
         let merged = merge(&obj, &spec);
         assert!(merged.properties.contains_key("a"));
         assert!(merged.properties.contains_key("b"));
@@ -139,23 +118,20 @@ mod tests {
 
     #[test]
     fn merges_properties_from_referenced_all_of() {
-        let spec = spec_with_components(serde_json::json!({
-            "schemas": {
-                "Base": {
-                    "type": "object",
-                    "properties": {"name": {"type": "string"}},
-                    "required": ["name"],
-                },
+        let spec = spec_with_schemas(json!({
+            "Base": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
             },
         }));
-        let obj: ObjectSchema = serde_json::from_value(serde_json::json!({
+        let obj = object_schema(json!({
             "type": "object",
             "allOf": [
                 {"$ref": "#/components/schemas/Base"},
                 {"type": "object", "properties": {"kind": {"type": "string"}}},
             ],
-        }))
-        .unwrap();
+        }));
         let merged = merge(&obj, &spec);
         assert!(merged.properties.contains_key("name"));
         assert!(merged.properties.contains_key("kind"));
@@ -164,15 +140,14 @@ mod tests {
 
     #[test]
     fn outer_properties_take_precedence() {
-        let spec = spec_with_components(serde_json::json!({"schemas": {}}));
-        let obj: ObjectSchema = serde_json::from_value(serde_json::json!({
+        let spec = spec_with_schemas(json!({}));
+        let obj = object_schema(json!({
             "type": "object",
             "properties": {"x": {"type": "string", "description": "outer"}},
             "allOf": [
                 {"type": "object", "properties": {"x": {"type": "integer", "description": "inner"}}},
             ],
-        }))
-        .unwrap();
+        }));
         let merged = merge(&obj, &spec);
         let x = merged.properties.get("x").unwrap();
         // Outer "string" wins over inner "integer".
@@ -189,13 +164,11 @@ mod tests {
     #[test]
     fn handles_cyclic_all_of_refs() {
         // Self-referential allOf should not recurse infinitely.
-        let spec = spec_with_components(serde_json::json!({
-            "schemas": {
-                "Loop": {
-                    "type": "object",
-                    "allOf": [{"$ref": "#/components/schemas/Loop"}],
-                    "properties": {"x": {"type": "string"}},
-                },
+        let spec = spec_with_schemas(json!({
+            "Loop": {
+                "type": "object",
+                "allOf": [{"$ref": "#/components/schemas/Loop"}],
+                "properties": {"x": {"type": "string"}},
             },
         }));
         let schema = spec

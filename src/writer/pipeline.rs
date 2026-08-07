@@ -12,7 +12,7 @@ use tracing::info;
 
 use crate::error::O2SError;
 
-use super::utils::{CollectWrites, infer_skill_name};
+use super::utils::{CollectWrites, Writes, infer_skill_name};
 use super::{auth, endpoint, manifest, schema, skill};
 
 /// Everything about how and where this skill was generated, as opposed to the spec content
@@ -45,7 +45,7 @@ pub async fn openapi2skill(
         }
     }
 
-    let mut writes: Vec<(PathBuf, String)> = Vec::new();
+    let mut writes = Writes::default();
 
     let manifest_writer = manifest::Writer {
         raw: generation.manifest_raw,
@@ -70,7 +70,7 @@ pub async fn openapi2skill(
         w.collect_writes(spec, &dir, &mut writes);
     }
 
-    write_all(writes).await?;
+    write_all(writes.into_vec()).await?;
     info!("Wrote skill under {:?}", dir);
 
     Ok(())

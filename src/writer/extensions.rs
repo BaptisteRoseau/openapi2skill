@@ -1,6 +1,8 @@
 use oas3::Map;
 use serde_json::Value;
 
+use crate::writer::utils::Table;
+
 pub(crate) fn render_extensions_table(extensions: &Map<String, Value>) -> String {
     let rows: Vec<(&str, String)> = extensions
         .iter()
@@ -11,12 +13,11 @@ pub(crate) fn render_extensions_table(extensions: &Map<String, Value>) -> String
         return String::new();
     }
 
-    let mut out = "### Extensions\n\n| Extension | Value |\n|-----------|-------|\n".to_string();
+    let mut table = Table::new(&["Extension", "Value"]);
     for (key, val) in rows {
-        out.push_str(&format!("| `{key}` | `{val}` |\n"));
+        table.row(&[format!("`{key}`"), format!("`{val}`")]);
     }
-    out.push('\n');
-    out
+    format!("### Extensions\n\n{}", table.finish())
 }
 
 fn scalar_display(v: &Value) -> Option<String> {

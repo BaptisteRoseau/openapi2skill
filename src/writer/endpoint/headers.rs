@@ -5,6 +5,7 @@ use oas3::{
 use tracing::warn;
 
 use super::params::render_param_type;
+use crate::writer::utils::{Table, desc_cell};
 
 pub(super) fn render_response_headers_table(
     headers: &Map<String, ObjectOrReference<Header>>,
@@ -13,9 +14,7 @@ pub(super) fn render_response_headers_table(
     if headers.is_empty() {
         return String::new();
     }
-    let mut out =
-        "### Response Headers\n\n| Header | Type | Description |\n|--------|------|-------------|\n"
-            .to_string();
+    let mut table = Table::new(&["Header", "Type", "Description"]);
     for (name, header_ref) in headers {
         let header = match header_ref.resolve(spec) {
             Ok(h) => h,
@@ -24,20 +23,13 @@ pub(super) fn render_response_headers_table(
                 continue;
             }
         };
-        out.push_str(&format!(
-            "| `{}` | {} | {} |\n",
-            name,
+        table.row(&[
+            format!("`{name}`"),
             render_param_type(header.schema.as_ref(), spec),
-            header
-                .description
-                .as_deref()
-                .map(crate::writer::utils::normalize_desc)
-                .as_deref()
-                .unwrap_or("-"),
-        ));
+            desc_cell(header.description.as_deref()),
+        ]);
     }
-    out.push('\n');
-    out
+    format!("### Response Headers\n\n{}", table.finish())
 }
 
 #[cfg(test)]
@@ -45,11 +37,7 @@ mod tests {
     use oas3::spec::{Header, ObjectOrReference};
 
     use super::*;
-
-    fn empty_spec() -> OpenApiV3Spec {
-        oas3::from_json(r#"{"openapi":"3.1.0","info":{"title":"Test","version":"1.0"},"paths":{}}"#)
-            .unwrap()
-    }
+    use crate::writer::testutil::empty_spec;
 
     #[test]
     fn empty_headers_returns_empty_string() {

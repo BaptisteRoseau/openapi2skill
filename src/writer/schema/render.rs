@@ -9,7 +9,7 @@ use tracing::warn;
 use super::{
     composition::merge_all_of,
     context::RenderCtx,
-    properties::{array_item_lines, render_properties_lines},
+    properties::{is_array, item_lines_or_null, render_properties_lines},
     types::{primitive_example, type_comment},
 };
 use crate::writer::utils::primary_type;
@@ -55,13 +55,8 @@ pub(super) fn render_schema_jsonc_inner(schema: &Schema, ctx: &mut RenderCtx<'_>
 
 pub(super) fn render_top_level_object(obj: &ObjectSchema, ctx: &mut RenderCtx<'_>) -> String {
     let merged = merge_all_of(obj, ctx);
-    if merged
-        .schema_type
-        .as_ref()
-        .map(|ts| ts.is_array_or_nullable_array())
-        .unwrap_or(false)
-    {
-        return render_top_level_array(&merged, ctx);
+    if is_array(&merged) {
+        return wrap_lines("[", item_lines_or_null(&merged, 1, ctx), "]");
     }
     if is_primitive(&merged) {
         return render_top_level_primitive(&merged);
@@ -69,21 +64,13 @@ pub(super) fn render_top_level_object(obj: &ObjectSchema, ctx: &mut RenderCtx<'_
     if merged.properties.is_empty() {
         return "{\n  // empty object\n}".to_string();
     }
-    let mut lines = vec!["{".to_string()];
-    lines.extend(render_properties_lines(&merged, 1, ctx));
-    lines.push("}".to_string());
-    lines.join("\n")
+    wrap_lines("{", render_properties_lines(&merged, 1, ctx), "}")
 }
 
-fn render_top_level_array(obj: &ObjectSchema, ctx: &mut RenderCtx<'_>) -> String {
-    let item_lines = obj
-        .items
-        .as_ref()
-        .map(|items| array_item_lines(items, 1, ctx))
-        .unwrap_or_else(|| vec!["  null".to_string()]);
-    let mut lines = vec!["[".to_string()];
-    lines.extend(item_lines);
-    lines.push("]".to_string());
+fn wrap_lines(open: &str, inner: Vec<String>, close: &str) -> String {
+    let mut lines = vec![open.to_string()];
+    lines.extend(inner);
+    lines.push(close.to_string());
     lines.join("\n")
 }
 

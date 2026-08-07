@@ -117,11 +117,38 @@ This is a binary-only crate — do not write `src/lib.rs`. Integration tests run
 
 ### Writer pipeline (`src/writer/`)
 
-`openapi2skill()` in `mod.rs`:
-1. Calls `{skill,auth,endpoint,schema}::collect_writes()` — each appends `(PathBuf, String)` pairs synchronously.
+`openapi2skill()` in `pipeline.rs`:
+1. Calls `{skill,manifest,auth,endpoint,schema}::Writer::collect_writes()` — each appends to a
+   `Writes` collector synchronously (`Writes::push` logs and records one `(PathBuf, String)` pair).
 2. Spawns one `tokio::task` per pair for parallel async file I/O.
 
-`schema::render_schema_jsonc()` is shared between `schema.rs` (schema files) and `endpoint.rs` (request/response bodies).
+`schema::render_schema_jsonc()` is shared between `schema/writer.rs` (schema files) and
+`endpoint/body.rs` (request/response bodies).
+
+### Shared writer helpers (`src/writer/utils/`)
+
+Cross-cutting helpers live here rather than being re-derived per writer:
+
+- `markdown.rs` — `Table` builder (every pipe table goes through it), `normalize_desc`,
+  `desc_paragraph`, `desc_cell`, `build_index`.
+- `naming.rs` — case conversions, path slugs, `endpoint_filename`, `op_category`, `category_label`.
+- `refs.rs` — `schema_ref_name`, `ref_display_name`, `schema_doc_link` (the one place
+  `#/components/schemas/` is parsed).
+- `types.rs` — `primary_type`, `bare_type_name`, `type_label` (shared by parameter tables and
+  schema comments; the `inlines_format` predicate is what differs between them).
+- `servers.rs` — `effective_server_bases`.
+- `writes.rs` — `Writes` collector and the `CollectWrites` trait.
+
+### Fetcher (`src/fetcher/`)
+
+- `loader.rs` — source resolution (URL vs path), extension detection, parsing.
+- `sanitize.rs` — normalizes non-compliant real-world specs before handing them to `oas3`.
+
+### Test fixtures
+
+Unit tests share spec builders from `src/writer/testutil.rs` (`spec_from`, `empty_spec`,
+`spec_with_servers`, `spec_with_paths`, `spec_with_schemas`, `first_operation`, `object_schema`)
+instead of each module hand-rolling its own JSON spec string.
 
 ### Key oas3 types
 

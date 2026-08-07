@@ -1,10 +1,14 @@
 use std::collections::{HashMap, HashSet};
 
 use oas3::{
-    OpenApiV3Spec,
-    spec::{ObjectOrReference, Operation, Response, Schema},
+    Map, OpenApiV3Spec,
+    spec::{MediaType, ObjectOrReference, Operation, Response},
 };
 
+use crate::writer::utils::schema_ref_name;
+
+/// Schema names referenced by two or more operations. These get their own schema file and are
+/// linked to rather than inlined, so a shared payload isn't repeated in every endpoint.
 pub(super) fn collect_multi_use_schemas(spec: &OpenApiV3Spec) -> HashSet<String> {
     let mut counts: HashMap<String, usize> = HashMap::new();
     for (_, _, op) in spec.operations() {
@@ -33,11 +37,7 @@ fn collect_body_refs(op: &Operation, spec: &OpenApiV3Spec) -> Vec<String> {
     let Ok(body) = body_ref.resolve(spec) else {
         return Vec::new();
     };
-    body.content
-        .values()
-        .filter_map(|mt| mt.schema.as_ref().and_then(top_level_ref_name))
-        .map(str::to_string)
-        .collect()
+    content_ref_names(&body.content)
 }
 
 fn collect_response_refs(op: &Operation, spec: &OpenApiV3Spec) -> Vec<String> {
@@ -47,17 +47,15 @@ fn collect_response_refs(op: &Operation, spec: &OpenApiV3Spec) -> Vec<String> {
     responses
         .values()
         .filter_map(|resp_ref| resolve_response(resp_ref, spec))
-        .flat_map(|resp| {
-            resp.content
-                .values()
-                .filter_map(|mt| {
-                    mt.schema
-                        .as_ref()
-                        .and_then(top_level_ref_name)
-                        .map(str::to_string)
-                })
-                .collect::<Vec<_>>()
-        })
+        .flat_map(|resp| content_ref_names(&resp.content))
+        .collect()
+}
+
+fn content_ref_names(content: &Map<String, MediaType>) -> Vec<String> {
+    content
+        .values()
+        .filter_map(|mt| mt.schema.as_ref().and_then(schema_ref_name))
+        .map(str::to_string)
         .collect()
 }
 
@@ -68,17 +66,5 @@ pub(super) fn resolve_response(
     match resp_ref {
         ObjectOrReference::Object(r) => Some(r.clone()),
         ObjectOrReference::Ref { .. } => resp_ref.resolve(spec).ok(),
-    }
-}
-
-pub(super) fn top_level_ref_name(schema: &Schema) -> Option<&str> {
-    match schema {
-        Schema::Object(oor) => match oor.as_ref() {
-            ObjectOrReference::Ref { ref_path, .. } => {
-                ref_path.strip_prefix("#/components/schemas/")
-            }
-            _ => None,
-        },
-        _ => None,
     }
 }

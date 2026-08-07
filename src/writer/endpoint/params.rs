@@ -6,6 +6,8 @@ use oas3::{
 };
 use tracing::warn;
 
+use crate::writer::utils::{Table, desc_cell, ref_display_name, type_label};
+
 /// Returns `?key=val&key=val` for all required query parameters, or `""` if none.
 pub(super) fn required_query_string(params: &[&Parameter], spec: &OpenApiV3Spec) -> String {
     let pairs: Vec<String> = params
@@ -83,56 +85,39 @@ fn single_type_query_example(t: SchemaType) -> String {
     }
 }
 
+/// Path parameters are required unless stated otherwise; query parameters are optional.
 pub(super) fn render_path_params_table(params: &[&Parameter], spec: &OpenApiV3Spec) -> String {
-    if params.is_empty() {
-        return String::new();
-    }
-    let mut out = "### Path Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n".to_string();
-    for p in params {
-        let req = if p.required.unwrap_or(true) {
-            "Yes"
-        } else {
-            "No"
-        };
-        out.push_str(&format!(
-            "| `{}` | {} | {req} | {} |\n",
-            p.name,
-            render_param_type(effective_schema(p), spec),
-            p.description
-                .as_deref()
-                .map(crate::writer::utils::normalize_desc)
-                .as_deref()
-                .unwrap_or("-"),
-        ));
-    }
-    out.push('\n');
-    out
+    render_params_table("Path", params, spec, true)
 }
 
 pub(super) fn render_query_params_table(params: &[&Parameter], spec: &OpenApiV3Spec) -> String {
+    render_params_table("Query", params, spec, false)
+}
+
+fn render_params_table(
+    kind: &str,
+    params: &[&Parameter],
+    spec: &OpenApiV3Spec,
+    required_by_default: bool,
+) -> String {
     if params.is_empty() {
         return String::new();
     }
-    let mut out = "### Query Parameters\n\n| Parameter | Type | Required | Description |\n|-----------|------|----------|-------------|\n".to_string();
+    let mut table = Table::new(&["Parameter", "Type", "Required", "Description"]);
     for p in params {
-        let req = if p.required.unwrap_or(false) {
+        let required = if p.required.unwrap_or(required_by_default) {
             "Yes"
         } else {
             "No"
         };
-        out.push_str(&format!(
-            "| `{}` | {} | {req} | {} |\n",
-            p.name,
+        table.row(&[
+            format!("`{}`", p.name),
             render_param_type(effective_schema(p), spec),
-            p.description
-                .as_deref()
-                .map(crate::writer::utils::normalize_desc)
-                .as_deref()
-                .unwrap_or("-"),
-        ));
+            required.to_string(),
+            desc_cell(p.description.as_deref()),
+        ]);
     }
-    out.push('\n');
-    out
+    format!("### {kind} Parameters\n\n{}", table.finish())
 }
 
 fn effective_schema(p: &Parameter) -> Option<&Schema> {
@@ -161,10 +146,7 @@ pub(super) fn render_param_type(schema: Option<&Schema>, spec: &OpenApiV3Spec) -
         Schema::Boolean(_) => "boolean".to_string(),
         Schema::Object(oor) => match oor.as_ref() {
             ObjectOrReference::Object(obj) => render_param_object_type(obj),
-            ObjectOrReference::Ref { ref_path, .. } => ref_path
-                .strip_prefix("#/components/schemas/")
-                .unwrap_or(ref_path)
-                .to_string(),
+            ObjectOrReference::Ref { ref_path, .. } => ref_display_name(ref_path).to_string(),
         },
     }
 }
@@ -188,42 +170,14 @@ fn render_param_object_type(obj: &ObjectSchema) -> String {
     format!("{base} ({vals})")
 }
 
+/// Parameter tables inline the format for every type that has one, unlike schema comments.
 fn param_base_type(ts: Option<&SchemaTypeSet>, fmt: Option<&str>) -> String {
-    match ts {
-        None => "any".to_string(),
-        Some(SchemaTypeSet::Single(t)) => single_param_type(*t, fmt),
-        Some(SchemaTypeSet::Multiple(types)) => {
-            let inner: Vec<String> = types.iter().copied().map(bare_param_type).collect();
-            format!("array[{}]", inner.join(", "))
-        }
-    }
-}
-
-fn single_param_type(t: SchemaType, fmt: Option<&str>) -> String {
-    match t {
-        SchemaType::Integer => fmt
-            .map(|f| format!("integer ({f})"))
-            .unwrap_or_else(|| "integer".to_string()),
-        SchemaType::Number => fmt
-            .map(|f| format!("number ({f})"))
-            .unwrap_or_else(|| "number".to_string()),
-        SchemaType::String => fmt
-            .map(|f| format!("string ({f})"))
-            .unwrap_or_else(|| "string".to_string()),
-        _ => bare_param_type(t),
-    }
-}
-
-fn bare_param_type(t: SchemaType) -> String {
-    match t {
-        SchemaType::Integer => "integer".to_string(),
-        SchemaType::Number => "number".to_string(),
-        SchemaType::String => "string".to_string(),
-        SchemaType::Boolean => "boolean".to_string(),
-        SchemaType::Array => "array".to_string(),
-        SchemaType::Object => "object".to_string(),
-        SchemaType::Null => "null".to_string(),
-    }
+    type_label(ts, fmt, |t| {
+        matches!(
+            t,
+            SchemaType::Integer | SchemaType::Number | SchemaType::String
+        )
+    })
 }
 
 fn param_constraints(obj: &ObjectSchema) -> Vec<String> {
@@ -243,7 +197,7 @@ fn param_constraints(obj: &ObjectSchema) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oas3::spec::{SchemaType, SchemaTypeSet};
+    use crate::writer::testutil::{empty_spec, object_schema};
 
     fn single(t: SchemaType) -> SchemaTypeSet {
         SchemaTypeSet::Single(t)
@@ -365,49 +319,38 @@ mod tests {
 
     #[test]
     fn param_constraints_empty_when_no_bounds() {
-        let obj: ObjectSchema = serde_json::from_value(serde_json::json!({})).unwrap();
+        let obj = object_schema(serde_json::json!({}));
         assert!(param_constraints(&obj).is_empty());
     }
 
     #[test]
     fn param_constraints_both_bounds() {
-        let obj: ObjectSchema =
-            serde_json::from_value(serde_json::json!({"minimum": 1, "maximum": 10})).unwrap();
+        let obj = object_schema(serde_json::json!({"minimum": 1, "maximum": 10}));
         assert_eq!(param_constraints(&obj), vec!["1..10"]);
     }
 
     #[test]
     fn param_constraints_lower_only() {
-        let obj: ObjectSchema = serde_json::from_value(serde_json::json!({"minimum": 5})).unwrap();
+        let obj = object_schema(serde_json::json!({"minimum": 5}));
         assert_eq!(param_constraints(&obj), vec!["≥5"]);
     }
 
     #[test]
     fn param_constraints_upper_only() {
-        let obj: ObjectSchema =
-            serde_json::from_value(serde_json::json!({"maximum": 100})).unwrap();
+        let obj = object_schema(serde_json::json!({"maximum": 100}));
         assert_eq!(param_constraints(&obj), vec!["≤100"]);
     }
 
     #[test]
     fn param_constraints_max_length() {
-        let obj: ObjectSchema =
-            serde_json::from_value(serde_json::json!({"maxLength": 255})).unwrap();
+        let obj = object_schema(serde_json::json!({"maxLength": 255}));
         assert_eq!(param_constraints(&obj), vec!["max_len:255"]);
     }
 
     #[test]
     fn param_constraints_bounds_and_max_length() {
-        let obj: ObjectSchema = serde_json::from_value(
-            serde_json::json!({"minimum": 0, "maximum": 50, "maxLength": 8}),
-        )
-        .unwrap();
+        let obj = object_schema(serde_json::json!({"minimum": 0, "maximum": 50, "maxLength": 8}));
         assert_eq!(param_constraints(&obj), vec!["0..50", "max_len:8"]);
-    }
-
-    fn empty_spec() -> OpenApiV3Spec {
-        oas3::from_json(r#"{"openapi":"3.1.0","info":{"title":"Test","version":"1.0"},"paths":{}}"#)
-            .unwrap()
     }
 
     fn make_param(value: serde_json::Value) -> Parameter {

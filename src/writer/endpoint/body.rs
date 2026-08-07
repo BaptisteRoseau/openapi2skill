@@ -2,14 +2,17 @@ use std::collections::HashSet;
 
 use oas3::{
     OpenApiV3Spec,
-    spec::{ObjectOrReference, Operation, Response},
+    spec::{ObjectOrReference, Operation, Response, Schema},
 };
 use tracing::warn;
 
 use super::headers::render_response_headers_table;
 use super::links::render_response_links_table;
-use super::refs::{resolve_response, top_level_ref_name};
-use crate::writer::{schema as schema_writer, utils::camel_to_kebab};
+use super::refs::resolve_response;
+use crate::writer::{
+    schema as schema_writer,
+    utils::{desc_paragraph, schema_doc_link, schema_ref_name},
+};
 
 pub(super) fn render_payload_section(
     op: &Operation,
@@ -30,16 +33,19 @@ pub(super) fn render_payload_section(
         }
     };
     let mut out = "### Payload\n\n".to_string();
-    let media = body
-        .content
-        .get("application/json")
-        .or_else(|| body.content.values().next());
-    if let Some(mt) = media
-        && let Some(schema) = &mt.schema
-    {
+    if let Some(schema) = preferred_schema(&body.content) {
         out.push_str(&render_schema_block(schema, spec, multi_use));
     }
     out
+}
+
+/// The JSON media type when present, else whichever content type comes first.
+fn preferred_schema(content: &oas3::Map<String, oas3::spec::MediaType>) -> Option<&Schema> {
+    content
+        .get("application/json")
+        .or_else(|| content.values().next())?
+        .schema
+        .as_ref()
 }
 
 pub(super) fn render_responses_section(
@@ -79,47 +85,24 @@ fn render_response(
             .join(", ");
         out.push_str(&format!("**Response Content-Type:** {types}\n\n"));
     }
-    if let Some(desc) = &resp.description {
-        let desc = crate::writer::utils::normalize_desc(desc);
-        if !desc.is_empty() {
-            out.push_str(&desc);
-            out.push_str("\n\n");
-        }
-    }
+    out.push_str(&desc_paragraph(resp.description.as_deref()));
     out.push_str(&render_response_headers_table(&resp.headers, spec));
-    out.push_str(&render_response_body(&resp, spec, multi_use));
+    if let Some(schema) = preferred_schema(&resp.content) {
+        out.push_str(&render_schema_block(schema, spec, multi_use));
+    }
     out.push_str(&render_response_links_table(&resp.links, spec));
     out
 }
 
-fn render_response_body(
-    resp: &Response,
-    spec: &OpenApiV3Spec,
-    multi_use: &HashSet<String>,
-) -> String {
-    let media = resp
-        .content
-        .get("application/json")
-        .or_else(|| resp.content.values().next());
-    if let Some(mt) = media
-        && let Some(schema) = &mt.schema
-    {
-        render_schema_block(schema, spec, multi_use)
-    } else {
-        String::new()
-    }
-}
-
 fn render_schema_block(
-    schema: &oas3::spec::Schema,
+    schema: &Schema,
     spec: &OpenApiV3Spec,
     multi_use: &HashSet<String>,
 ) -> String {
-    if let Some(ref_name) = top_level_ref_name(schema)
+    if let Some(ref_name) = schema_ref_name(schema)
         && multi_use.contains(ref_name)
     {
-        let slug = camel_to_kebab(ref_name);
-        return format!("See [{ref_name}](../../schemas/{slug}.md)\n\n");
+        return format!("See [{ref_name}]({})\n\n", schema_doc_link(ref_name));
     }
     format!(
         "```jsonc\n{}\n```\n\n",
