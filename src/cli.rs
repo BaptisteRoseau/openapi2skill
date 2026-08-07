@@ -29,6 +29,31 @@ pub struct CliConfig {
     pub server: Vec<String>,
 }
 
+impl CliConfig {
+    /// Rebuilds an invocation command from the parsed config. Used as a fallback when the
+    /// original `argv` isn't available to record verbatim (see [`std::env::args`]).
+    pub fn to_command_string(&self, program: &str) -> String {
+        let mut parts = vec![program.to_string(), self.path_or_url.clone()];
+
+        if let Some(dir) = &self.output_dir {
+            parts.push("--output-dir".to_string());
+            parts.push(dir.display().to_string());
+        }
+        if self.verbose {
+            parts.push("--verbose".to_string());
+        }
+        if self.force {
+            parts.push("--force".to_string());
+        }
+        for server in &self.server {
+            parts.push("--server".to_string());
+            parts.push(server.clone());
+        }
+
+        parts.join(" ")
+    }
+}
+
 pub fn normalize_server_url(url: &str) -> String {
     if url.contains("://") {
         url.to_owned()
@@ -70,6 +95,38 @@ mod tests {
         assert_eq!(
             normalize_server_url("api.example.com/v1"),
             "https://api.example.com/v1"
+        );
+    }
+
+    fn config(path_or_url: &str) -> CliConfig {
+        CliConfig {
+            path_or_url: path_or_url.to_string(),
+            output_dir: None,
+            verbose: false,
+            force: false,
+            server: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn command_string_bare_invocation() {
+        let cfg = config("spec.json");
+        assert_eq!(
+            cfg.to_command_string("openapi2skill"),
+            "openapi2skill spec.json"
+        );
+    }
+
+    #[test]
+    fn command_string_includes_all_flags() {
+        let mut cfg = config("spec.json");
+        cfg.output_dir = Some(PathBuf::from("my_skill"));
+        cfg.verbose = true;
+        cfg.force = true;
+        cfg.server = vec!["https://a.example.com".to_string()];
+        assert_eq!(
+            cfg.to_command_string("openapi2skill"),
+            "openapi2skill spec.json --output-dir my_skill --verbose --force --server https://a.example.com"
         );
     }
 }

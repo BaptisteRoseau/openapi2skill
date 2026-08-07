@@ -4,7 +4,15 @@ use serde_json::Value;
 use std::path::PathBuf;
 use tracing::{info, warn};
 
-pub async fn load_oapi(link: &str) -> Result<OpenApiV3Spec, O2SError> {
+/// The parsed spec together with the verbatim source text, kept so it can be written out
+/// unmodified as the skill's `openapi.json`/`openapi.yml` manifest.
+pub struct LoadedSpec {
+    pub spec: OpenApiV3Spec,
+    pub raw: String,
+    pub manifest_extension: &'static str,
+}
+
+pub async fn load_oapi(link: &str) -> Result<LoadedSpec, O2SError> {
     if is_url(link) {
         load_http(link).await
     } else {
@@ -16,14 +24,14 @@ pub fn is_url(link: &str) -> bool {
     link.starts_with("http://") || link.starts_with("https://")
 }
 
-async fn load_http(url: &str) -> Result<OpenApiV3Spec, O2SError> {
+async fn load_http(url: &str) -> Result<LoadedSpec, O2SError> {
     info!("Fetching {url}");
     let content = reqwest::get(url).await?.error_for_status()?.text().await?;
     let ext = url_extension(url);
-    parse_content(&content, &ext)
+    build_loaded_spec(content, &ext)
 }
 
-async fn load_file(path_str: &str) -> Result<OpenApiV3Spec, O2SError> {
+async fn load_file(path_str: &str) -> Result<LoadedSpec, O2SError> {
     info!("Loading file {path_str}");
     let content = tokio::fs::read_to_string(path_str).await?;
     let path = PathBuf::from(path_str);
@@ -32,7 +40,28 @@ async fn load_file(path_str: &str) -> Result<OpenApiV3Spec, O2SError> {
         .and_then(|e| e.to_str())
         .unwrap_or("")
         .to_lowercase();
-    parse_content(&content, &ext)
+    build_loaded_spec(content, &ext)
+}
+
+fn build_loaded_spec(content: String, ext: &str) -> Result<LoadedSpec, O2SError> {
+    let spec = parse_content(&content, ext)?;
+    let manifest_extension = manifest_extension(&content, ext);
+    Ok(LoadedSpec {
+        spec,
+        raw: content,
+        manifest_extension,
+    })
+}
+
+/// `yaml` is normalized to `yml` per the skill's manifest naming convention. When the
+/// source extension isn't recognized, the format is detected from content.
+fn manifest_extension(content: &str, ext: &str) -> &'static str {
+    match ext {
+        "yaml" | "yml" => "yml",
+        "json" => "json",
+        _ if serde_json::from_str::<Value>(content).is_ok() => "json",
+        _ => "yml",
+    }
 }
 
 fn url_extension(url: &str) -> String {
@@ -352,6 +381,33 @@ mod tests {
     #[test]
     fn url_extension_lowercases() {
         assert_eq!(url_extension("https://example.com/spec.JSON"), "json");
+    }
+
+    // --- manifest_extension ---
+
+    #[test]
+    fn manifest_extension_json_passthrough() {
+        assert_eq!(manifest_extension("{}", "json"), "json");
+    }
+
+    #[test]
+    fn manifest_extension_normalizes_yaml_to_yml() {
+        assert_eq!(manifest_extension("openapi: 3.0.0", "yaml"), "yml");
+    }
+
+    #[test]
+    fn manifest_extension_keeps_yml() {
+        assert_eq!(manifest_extension("openapi: 3.0.0", "yml"), "yml");
+    }
+
+    #[test]
+    fn manifest_extension_detects_json_from_content_when_ext_unknown() {
+        assert_eq!(manifest_extension(r#"{"openapi":"3.0.0"}"#, ""), "json");
+    }
+
+    #[test]
+    fn manifest_extension_falls_back_to_yml_when_ext_unknown_and_not_json() {
+        assert_eq!(manifest_extension("openapi: 3.0.0", ""), "yml");
     }
 
     // --- normalize_type_value ---

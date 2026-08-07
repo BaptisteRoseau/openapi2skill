@@ -18,6 +18,8 @@
 //!
 //! **Source:** https://example.com/grafana-openapi.json
 //!
+//! **Generated with:** `openapi2skill https://example.com/grafana-openapi.json`
+//!
 //! **Servers:**
 //! - /api
 //!
@@ -36,6 +38,14 @@
 //! - [authentication/index.md](./authentication/index.md): Authentication workflows
 //! - [endpoints/index.md](./endpoints/index.md): API endpoints
 //! - [schemas/index.md](./schemas/index.md): Data schemas, only if you need them alone. They are already included in endpoints.
+//!
+//! ## OpenAPI Manifest
+//!
+//! The raw OpenAPI manifest is available at [`openapi.json`](./openapi.json), fetched from
+//! https://example.com/grafana-openapi.json. It is provided only for tools that require the raw
+//! spec — e.g. generating an SDK, a Swagger/OpenAPI client, or a fuzzer. Do **not** read it to
+//! navigate this API: the indexed markdown files above contain the same information organized
+//! for far fewer tokens.
 
 use std::path::{Path, PathBuf};
 
@@ -48,6 +58,8 @@ pub(super) struct Writer {
     pub(super) name: String,
     pub(super) servers_override: Vec<String>,
     pub(super) source_url: Option<String>,
+    pub(super) manifest_filename: String,
+    pub(super) command: String,
 }
 
 impl CollectWrites for Writer {
@@ -64,6 +76,8 @@ impl CollectWrites for Writer {
                 &self.name,
                 &self.servers_override,
                 self.source_url.as_deref(),
+                &self.manifest_filename,
+                &self.command,
             ),
         );
         info!("Writing {:?}", write_path.0);
@@ -76,14 +90,22 @@ fn render(
     name: &str,
     servers_override: &[String],
     source_url: Option<&str>,
+    manifest_filename: &str,
+    command: &str,
 ) -> String {
     let title = &spec.info.title;
     let description = spec.info.description.as_deref().unwrap_or("");
 
     let mut out = render_skill_header(name, title);
-    out.push_str(&render_metadata(spec, servers_override, source_url));
+    out.push_str(&render_metadata(
+        spec,
+        servers_override,
+        source_url,
+        command,
+    ));
     out.push_str(&render_decription_and_navigation(description, spec));
     out.push_str(&render_index(spec));
+    out.push_str(&render_manifest_section(manifest_filename, source_url));
     out
 }
 
@@ -97,6 +119,7 @@ fn render_metadata(
     spec: &OpenApiV3Spec,
     servers_override: &[String],
     source_url: Option<&str>,
+    command: &str,
 ) -> String {
     let mut out = format!("**Version:** {}", spec.info.version);
 
@@ -115,6 +138,8 @@ fn render_metadata(
     if let Some(url) = source_url {
         out.push_str(&format!("**Source:** {url}\n\n"));
     }
+
+    out.push_str(&format!("**Generated with:** `{command}`\n\n"));
 
     if !servers_override.is_empty() {
         out.push_str("**Servers:**\n");
@@ -199,6 +224,19 @@ fn render_index(spec: &OpenApiV3Spec) -> String {
     out
 }
 
+fn render_manifest_section(manifest_filename: &str, source_url: Option<&str>) -> String {
+    let mut out = format!(
+        "\n## OpenAPI Manifest\n\nThe raw OpenAPI manifest is available at [`{manifest_filename}`](./{manifest_filename})"
+    );
+    if let Some(url) = source_url {
+        out.push_str(&format!(", fetched from {url}"));
+    }
+    out.push_str(
+        ". It is provided only for tools that require the raw spec — e.g. generating an SDK, a Swagger/OpenAPI client, or a fuzzer. Do **not** read it to navigate this API: the indexed markdown files above contain the same information organized for far fewer tokens.\n",
+    );
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -229,7 +267,7 @@ mod tests {
             "https://override1.example.com".to_string(),
             "https://override2.example.com".to_string(),
         ];
-        let out = render_metadata(&spec, &overrides, None);
+        let out = render_metadata(&spec, &overrides, None, "openapi2skill spec.json");
         assert!(
             out.contains("https://override1.example.com"),
             "expected override1 in:\n{out}"
@@ -247,7 +285,7 @@ mod tests {
     #[test]
     fn empty_override_falls_back_to_spec_servers() {
         let spec = minimal_spec(&["https://spec.example.com"]);
-        let out = render_metadata(&spec, &[], None);
+        let out = render_metadata(&spec, &[], None, "openapi2skill spec.json");
         assert!(
             out.contains("https://spec.example.com"),
             "expected spec server in:\n{out}"
@@ -257,7 +295,7 @@ mod tests {
     #[test]
     fn no_servers_section_when_both_empty() {
         let spec = minimal_spec(&[]);
-        let out = render_metadata(&spec, &[], None);
+        let out = render_metadata(&spec, &[], None, "openapi2skill spec.json");
         assert!(
             !out.contains("**Servers:**"),
             "servers section should be absent:\n{out}"
@@ -267,7 +305,12 @@ mod tests {
     #[test]
     fn source_url_rendered_when_present() {
         let spec = minimal_spec(&[]);
-        let out = render_metadata(&spec, &[], Some("https://example.com/spec.json"));
+        let out = render_metadata(
+            &spec,
+            &[],
+            Some("https://example.com/spec.json"),
+            "openapi2skill spec.json",
+        );
         assert!(
             out.contains("**Source:** https://example.com/spec.json"),
             "expected source line in:\n{out}"
@@ -277,10 +320,51 @@ mod tests {
     #[test]
     fn no_source_section_when_absent() {
         let spec = minimal_spec(&[]);
-        let out = render_metadata(&spec, &[], None);
+        let out = render_metadata(&spec, &[], None, "openapi2skill spec.json");
         assert!(
             !out.contains("**Source:**"),
             "source section should be absent:\n{out}"
+        );
+    }
+
+    #[test]
+    fn command_is_always_rendered() {
+        let spec = minimal_spec(&[]);
+        let out = render_metadata(&spec, &[], None, "openapi2skill spec.json --force");
+        assert!(
+            out.contains("**Generated with:** `openapi2skill spec.json --force`"),
+            "expected generated-with line in:\n{out}"
+        );
+    }
+
+    #[test]
+    fn manifest_section_links_filename() {
+        let out = render_manifest_section("openapi.json", None);
+        assert!(
+            out.contains("[`openapi.json`](./openapi.json)"),
+            "expected manifest link in:\n{out}"
+        );
+        assert!(
+            out.contains("Do **not** read it"),
+            "expected do-not-read caveat in:\n{out}"
+        );
+    }
+
+    #[test]
+    fn manifest_section_includes_source_when_present() {
+        let out = render_manifest_section("openapi.yml", Some("https://example.com/spec.yml"));
+        assert!(
+            out.contains("fetched from https://example.com/spec.yml"),
+            "expected source mention in:\n{out}"
+        );
+    }
+
+    #[test]
+    fn manifest_section_omits_source_when_absent() {
+        let out = render_manifest_section("openapi.json", None);
+        assert!(
+            !out.contains("fetched from"),
+            "should not mention a source:\n{out}"
         );
     }
 

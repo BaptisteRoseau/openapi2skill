@@ -36,6 +36,14 @@ fn test_spec_writes_successfully(
         String::from_utf8_lossy(&output.stderr)
     );
     assert!(out.join("SKILL.md").exists(), "{path:?}: missing SKILL.md");
+    let manifest_ext = match path.extension().and_then(|e| e.to_str()) {
+        Some("yaml") | Some("yml") => "yml",
+        _ => "json",
+    };
+    assert!(
+        out.join(format!("openapi.{manifest_ext}")).exists(),
+        "{path:?}: missing openapi.{manifest_ext} manifest"
+    );
     assert_no_empty_schema(out.join("schemas"));
     assert_no_empty_schema(out.join("endpoints"));
     assert_no_invalid_jsonc(out.join("schemas"));
@@ -169,6 +177,20 @@ fn test_generates_expected_files() {
     );
 
     assert!(out.join("SKILL.md").exists(), "missing SKILL.md");
+
+    assert!(
+        out.join("openapi.json").exists(),
+        "missing openapi.json manifest"
+    );
+    let skill_md = std::fs::read_to_string(out.join("SKILL.md")).unwrap();
+    assert!(
+        skill_md.contains("[`openapi.json`](./openapi.json)"),
+        "SKILL.md should link to the openapi.json manifest:\n{skill_md}"
+    );
+    assert!(
+        skill_md.contains("Do **not** read it"),
+        "SKILL.md should warn against reading the manifest:\n{skill_md}"
+    );
 
     assert!(
         out.join("endpoints/pet/index.md").exists(),

@@ -7,7 +7,7 @@ mod writer;
 use clap::Parser;
 use cli::{CliConfig, normalize_server_url};
 use fetcher::load_oapi;
-use writer::openapi2skill;
+use writer::{GenerationContext, openapi2skill};
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
@@ -21,16 +21,34 @@ async fn main() -> Result<(), anyhow::Error> {
         .collect();
 
     let source_url = fetcher::is_url(&config.path_or_url).then(|| config.path_or_url.clone());
+    let command = generation_command(&config);
 
-    let doc = load_oapi(config.path_or_url.as_str()).await?;
+    let loaded = load_oapi(config.path_or_url.as_str()).await?;
+    let generation = GenerationContext {
+        source_url,
+        manifest_raw: loaded.raw,
+        manifest_extension: loaded.manifest_extension,
+        command,
+    };
     openapi2skill(
-        &doc,
+        &loaded.spec,
         config.output_dir.as_deref(),
         config.force,
         servers,
-        source_url,
+        generation,
     )
     .await?;
 
     Ok(())
+}
+
+/// The literal command as typed, taken from `argv`. Falls back to rebuilding it from the
+/// parsed config on the rare platforms where `argv` isn't available.
+fn generation_command(config: &CliConfig) -> String {
+    let argv: Vec<String> = std::env::args().collect();
+    if argv.is_empty() {
+        config.to_command_string(env!("CARGO_BIN_NAME"))
+    } else {
+        argv.join(" ")
+    }
 }

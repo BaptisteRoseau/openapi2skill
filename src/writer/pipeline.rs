@@ -13,14 +13,24 @@ use tracing::info;
 use crate::error::O2SError;
 
 use super::utils::{CollectWrites, infer_skill_name};
-use super::{auth, endpoint, schema, skill};
+use super::{auth, endpoint, manifest, schema, skill};
+
+/// Everything about how and where this skill was generated, as opposed to the spec content
+/// itself: where the spec came from, its verbatim text for the manifest file, and the command
+/// that produced this skill.
+pub struct GenerationContext {
+    pub source_url: Option<String>,
+    pub manifest_raw: String,
+    pub manifest_extension: &'static str,
+    pub command: String,
+}
 
 pub async fn openapi2skill(
     spec: &OpenApiV3Spec,
     output_dir: Option<&Path>,
     force: bool,
     servers_override: Vec<String>,
-    source_url: Option<String>,
+    generation: GenerationContext,
 ) -> Result<(), anyhow::Error> {
     let skill_name = infer_skill_name(&spec.info.title, output_dir);
     let dir: PathBuf = output_dir
@@ -37,14 +47,21 @@ pub async fn openapi2skill(
 
     let mut writes: Vec<(PathBuf, String)> = Vec::new();
 
+    let manifest_writer = manifest::Writer {
+        raw: generation.manifest_raw,
+        extension: generation.manifest_extension,
+    };
     let skill_writer = skill::Writer {
         name: skill_name,
         servers_override: servers_override.clone(),
-        source_url,
+        source_url: generation.source_url,
+        manifest_filename: manifest_writer.filename(),
+        command: generation.command,
     };
     let endpoint_writer = endpoint::Writer { servers_override };
     let writers: &[&dyn CollectWrites] = &[
         &skill_writer,
+        &manifest_writer,
         &auth::Writer,
         &endpoint_writer,
         &schema::Writer,
