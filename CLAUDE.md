@@ -45,6 +45,7 @@ schemas/
 | **URL** | `{path}` |
 | **Auth** | {scheme names and scopes, or "None"} |
 | **Content-Type** | `application/json` |   ← only when request body exists
+| **Docs** | [{description}]({url}) |       ← only when the operation has `externalDocs`
 
 ## Input
 

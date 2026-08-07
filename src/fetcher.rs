@@ -66,7 +66,8 @@ fn parse_unknown(content: &str) -> Option<Value> {
 ///
 /// - `type: "any"` / `"any"` in a type array -> dropped.
 /// - boolean `required` in a schema body -> dropped.
-/// - boolean `exclusiveMinimum`/`exclusiveMaximum` -> dropped.
+/// - boolean `exclusiveMinimum`/`exclusiveMaximum` paired with a numeric `minimum`/`maximum`
+///   -> converted to the OpenAPI 3.1 numeric-bound form; unpaired -> dropped.
 /// - non-string `description` -> dropped.
 /// - null security requirement scopes -> `[]`.
 /// - non-absolute `url`/`termsOfService`/`authorizationUrl`/`tokenUrl`/`refreshUrl` -> dropped.
@@ -77,6 +78,11 @@ fn sanitize_invalid_types(value: Value) -> Value {
 fn sanitize(value: Value, in_schema: bool) -> Value {
     match value {
         Value::Object(map) => {
+            let map = if in_schema {
+                normalize_exclusive_bounds(map)
+            } else {
+                map
+            };
             let mut out = serde_json::Map::with_capacity(map.len());
             for (k, v) in map {
                 match k.as_str() {
@@ -99,11 +105,12 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
                             out.insert(k, sanitize(v, false));
                         }
                     }
-                    // OpenAPI 3.0 boolean form; oas3 expects a numeric bound.
+                    // OpenAPI 3.0 boolean form; already converted to the numeric 3.1 form
+                    // by `normalize_exclusive_bounds` when a sibling minimum/maximum existed.
                     "exclusiveMinimum" | "exclusiveMaximum" if in_schema => {
                         if matches!(v, Value::Bool(_)) {
                             warn!(
-                                "Dropping boolean `{k}` inside schema body (OpenAPI 3.0 draft-4 style, not valid in OpenAPI 3.1 schemas)"
+                                "Dropping boolean `{k}` inside schema body (OpenAPI 3.0 draft-4 style; no numeric minimum/maximum sibling to convert)"
                             );
                         } else {
                             out.insert(k, v);
@@ -182,6 +189,31 @@ fn sanitize(value: Value, in_schema: bool) -> Value {
         }
         other => other,
     }
+}
+
+/// Converts OpenAPI 3.0 draft-4 boolean `exclusiveMinimum`/`exclusiveMaximum` (paired with a
+/// numeric `minimum`/`maximum`) into the OpenAPI 3.1 form, where the bound itself is exclusive.
+/// `false` is simply dropped, since inclusive is already `minimum`/`maximum`'s default meaning.
+fn normalize_exclusive_bounds(
+    mut map: serde_json::Map<String, Value>,
+) -> serde_json::Map<String, Value> {
+    for (excl_key, bound_key) in [
+        ("exclusiveMinimum", "minimum"),
+        ("exclusiveMaximum", "maximum"),
+    ] {
+        match map.get(excl_key) {
+            Some(Value::Bool(true)) => {
+                if let Some(bound) = map.remove(bound_key) {
+                    map.insert(excl_key.to_string(), bound);
+                }
+            }
+            Some(Value::Bool(false)) => {
+                map.remove(excl_key);
+            }
+            _ => {}
+        }
+    }
+    map
 }
 
 fn sanitize_map_values(value: Value, in_schema: bool) -> Value {
@@ -407,6 +439,52 @@ mod tests {
         let out = sanitize_invalid_types(input);
         assert!(out[0].get("type").is_none());
         assert_eq!(out[1].get("type"), Some(&json!("string")));
+    }
+
+    // --- normalize_exclusive_bounds / exclusiveMinimum-Maximum sanitization ---
+
+    #[test]
+    fn exclusive_minimum_true_converts_to_numeric_form() {
+        let input = json!({"schema": {"properties": {"age": {"type": "integer", "minimum": 5, "exclusiveMinimum": true}}}});
+        let out = sanitize_invalid_types(input);
+        let age = &out["schema"]["properties"]["age"];
+        assert_eq!(age.get("exclusiveMinimum"), Some(&json!(5)));
+        assert!(age.get("minimum").is_none());
+    }
+
+    #[test]
+    fn exclusive_maximum_true_converts_to_numeric_form() {
+        let input = json!({"schema": {"properties": {"age": {"type": "integer", "maximum": 120, "exclusiveMaximum": true}}}});
+        let out = sanitize_invalid_types(input);
+        let age = &out["schema"]["properties"]["age"];
+        assert_eq!(age.get("exclusiveMaximum"), Some(&json!(120)));
+        assert!(age.get("maximum").is_none());
+    }
+
+    #[test]
+    fn exclusive_minimum_false_is_dropped_and_minimum_kept() {
+        let input = json!({"schema": {"properties": {"age": {"type": "integer", "minimum": 5, "exclusiveMinimum": false}}}});
+        let out = sanitize_invalid_types(input);
+        let age = &out["schema"]["properties"]["age"];
+        assert!(age.get("exclusiveMinimum").is_none());
+        assert_eq!(age.get("minimum"), Some(&json!(5)));
+    }
+
+    #[test]
+    fn exclusive_minimum_true_without_sibling_is_dropped() {
+        let input = json!({"schema": {"properties": {"age": {"type": "integer", "exclusiveMinimum": true}}}});
+        let out = sanitize_invalid_types(input);
+        let age = &out["schema"]["properties"]["age"];
+        assert!(age.get("exclusiveMinimum").is_none());
+    }
+
+    #[test]
+    fn exclusive_minimum_numeric_form_passes_through() {
+        // Already OpenAPI 3.1 style; nothing to convert.
+        let input = json!({"schema": {"properties": {"age": {"type": "integer", "exclusiveMinimum": 5}}}});
+        let out = sanitize_invalid_types(input);
+        let age = &out["schema"]["properties"]["age"];
+        assert_eq!(age.get("exclusiveMinimum"), Some(&json!(5)));
     }
 
     // --- parse_content ---

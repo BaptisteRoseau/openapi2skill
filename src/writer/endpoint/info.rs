@@ -24,8 +24,18 @@ pub(super) fn render_info_table(
     if let Some(ct) = render_content_type(method, op, spec) {
         out.push_str(&format!("| **Request Content-Type** | {ct} |\n"));
     }
+    if let Some(docs) = &op.external_docs {
+        out.push_str(&format!("| **Docs** | {} |\n", render_external_docs(docs)));
+    }
     out.push('\n');
     out
+}
+
+fn render_external_docs(docs: &oas3::spec::ExternalDoc) -> String {
+    match &docs.description {
+        Some(desc) => format!("[{desc}]({})", docs.url),
+        None => docs.url.to_string(),
+    }
 }
 
 fn render_content_type(method: &str, op: &Operation, spec: &OpenApiV3Spec) -> Option<String> {
@@ -182,6 +192,41 @@ mod tests {
         assert!(
             out.contains("| **Full URL** | `https://staging.example.com/query?q=string` |"),
             "expected suffix on second server:\n{out}"
+        );
+    }
+
+    #[test]
+    fn no_docs_row_when_no_external_docs() {
+        let spec = spec_with_operation("https://api.example.com");
+        let out = render(&spec, &[]);
+        assert!(!out.contains("**Docs**"), "unexpected Docs row:\n{out}");
+    }
+
+    #[test]
+    fn docs_row_renders_link_with_description() {
+        let json = r#"{"openapi":"3.0.0","info":{"title":"T","version":"1"},"paths":{"/query":{"get":{
+            "externalDocs":{"url":"https://docs.example.com/query","description":"More info"},
+            "responses":{"200":{"description":"OK"}}
+        }}}}"#;
+        let spec: oas3::OpenApiV3Spec = oas3::from_json(json).unwrap();
+        let out = render(&spec, &[]);
+        assert!(
+            out.contains("| **Docs** | [More info](https://docs.example.com/query) |"),
+            "expected Docs row with link:\n{out}"
+        );
+    }
+
+    #[test]
+    fn docs_row_renders_bare_url_without_description() {
+        let json = r#"{"openapi":"3.0.0","info":{"title":"T","version":"1"},"paths":{"/query":{"get":{
+            "externalDocs":{"url":"https://docs.example.com/query"},
+            "responses":{"200":{"description":"OK"}}
+        }}}}"#;
+        let spec: oas3::OpenApiV3Spec = oas3::from_json(json).unwrap();
+        let out = render(&spec, &[]);
+        assert!(
+            out.contains("| **Docs** | https://docs.example.com/query |"),
+            "expected Docs row with bare url:\n{out}"
         );
     }
 }
