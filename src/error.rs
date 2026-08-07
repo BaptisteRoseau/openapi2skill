@@ -19,4 +19,9 @@ pub enum O2SError {
 
     #[error("Output directory already exists: {0} (use --force to overwrite)")]
     OutputDirExists(std::path::PathBuf),
+
+    #[error(
+        "This is a Swagger {0} spec, not OpenAPI 3.x. Convert it first, e.g. with `npx swagger2openapi <input> -o <output> --patch`."
+    )]
+    UnsupportedSwaggerVersion(String),
 }

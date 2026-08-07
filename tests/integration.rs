@@ -225,6 +225,22 @@ fn test_error_when_output_dir_exists() {
 }
 
 #[test]
+fn test_swagger_2_spec_fails_with_clear_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out");
+    let output = run_binary("tests/assets/unsupported/mailchimp_swagger2.json", &out);
+    assert!(
+        !output.status.success(),
+        "binary should fail on a Swagger 2.0 spec"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("Swagger 2.0"),
+        "stderr should name Swagger 2.0 as the problem, got: {stderr}"
+    );
+}
+
+#[test]
 fn test_force_overwrites_existing_dir() {
     let tmp = tempfile::tempdir().unwrap();
     let out = tmp.path().join("out");

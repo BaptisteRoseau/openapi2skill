@@ -48,6 +48,9 @@ fn parse_content(content: &str, ext: &str) -> Result<OpenApiV3Spec, O2SError> {
             parse_unknown(content).ok_or_else(|| O2SError::InvalidFormat(other.to_string()))?
         }
     };
+    if let Some(version) = value.get("swagger").and_then(|v| v.as_str()) {
+        return Err(O2SError::UnsupportedSwaggerVersion(version.to_string()));
+    }
     let sanitized = sanitize_invalid_types(value);
     let json_text = serde_json::to_string(&sanitized)?;
     Ok(oas3::from_json(&json_text)?)
@@ -426,5 +429,14 @@ mod tests {
         let out = sanitize_invalid_types(input);
         assert!(out[0].get("type").is_none());
         assert_eq!(out[1].get("type"), Some(&json!("string")));
+    }
+
+    // --- parse_content ---
+
+    #[test]
+    fn parse_content_rejects_swagger_2() {
+        let err =
+            parse_content(r#"{"swagger": "2.0", "info": {}, "paths": {}}"#, "json").unwrap_err();
+        assert!(matches!(err, O2SError::UnsupportedSwaggerVersion(v) if v == "2.0"));
     }
 }
