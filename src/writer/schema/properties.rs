@@ -6,7 +6,7 @@ use super::{
     context::RenderCtx,
     types::{primitive_example, primitive_type_name, type_comment},
 };
-use crate::writer::utils::{ref_display_name, schema_doc_link, schema_ref_name};
+use crate::writer::utils::{ref_display_name, ref_path_of, schema_doc_link, schema_ref_name};
 
 pub(super) fn render_properties_lines(
     obj: &ObjectSchema,
@@ -96,6 +96,40 @@ fn requirement_label(is_required: bool) -> &'static str {
     if is_required { "required" } else { "optional" }
 }
 
+/// Placeholder body for a `$ref` the spec never defines, keeping the referenced name
+/// visible instead of collapsing to `null`.
+fn undefined_ref_placeholder(ref_path: &str) -> String {
+    format!(
+        "{{ /* {} (not defined in this spec) */ }}",
+        ref_display_name(ref_path)
+    )
+}
+
+fn unresolved_property_line(
+    name: &str,
+    schema: &Schema,
+    trail: &str,
+    depth: usize,
+    req: &str,
+) -> String {
+    let indent = indent(depth);
+    match ref_path_of(schema) {
+        Some(ref_path) => format!(
+            "{indent}\"{name}\": {}{trail}  // unresolved ref, {req}",
+            undefined_ref_placeholder(ref_path)
+        ),
+        None => format!("{indent}\"{name}\": null{trail}  // unknown, {req}"),
+    }
+}
+
+fn unresolved_item_line(items: &Schema, depth: usize) -> String {
+    let indent = indent(depth);
+    match ref_path_of(items) {
+        Some(ref_path) => format!("{indent}{}", undefined_ref_placeholder(ref_path)),
+        None => format!("{indent}null"),
+    }
+}
+
 fn resolved_property_lines(
     name: &str,
     schema: &Schema,
@@ -111,11 +145,9 @@ fn resolved_property_lines(
         Err(err) => {
             warn!(
                 property = name,
-                "could not resolve schema for property: {err}; rendering as null"
+                "could not resolve schema for property: {err}; rendering a placeholder"
             );
-            return vec![format!(
-                "{indent}\"{name}\": null{trail}  // unknown, {req}"
-            )];
+            return vec![unresolved_property_line(name, schema, trail, depth, req)];
         }
     };
 
@@ -132,10 +164,11 @@ fn resolved_property_lines(
                 warn!(
                     property = name,
                     ref_path = %ref_path,
-                    "property resolved to an unresolved $ref; rendering as null"
+                    "property resolved to an unresolved $ref; rendering a placeholder"
                 );
                 vec![format!(
-                    "{indent}\"{name}\": null{trail}  // unresolved ref, {req}"
+                    "{indent}\"{name}\": {}{trail}  // unresolved ref, {req}",
+                    undefined_ref_placeholder(ref_path)
                 )]
             }
         },
@@ -202,8 +235,8 @@ fn resolved_array_item_lines(items: &Schema, depth: usize, ctx: &mut RenderCtx<'
     let resolved = match items.resolve(ctx.spec) {
         Ok(s) => s,
         Err(err) => {
-            warn!("could not resolve array item schema: {err}; rendering as null");
-            return vec![format!("{indent}null")];
+            warn!("could not resolve array item schema: {err}; rendering a placeholder");
+            return vec![unresolved_item_line(items, depth)];
         }
     };
 
@@ -223,9 +256,9 @@ fn resolved_array_item_lines(items: &Schema, depth: usize, ctx: &mut RenderCtx<'
             ObjectOrReference::Ref { ref_path, .. } => {
                 warn!(
                     ref_path = %ref_path,
-                    "array item resolved to an unresolved $ref; rendering as null"
+                    "array item resolved to an unresolved $ref; rendering a placeholder"
                 );
-                vec![format!("{indent}null")]
+                vec![format!("{indent}{}", undefined_ref_placeholder(ref_path))]
             }
         },
     }
@@ -241,5 +274,106 @@ fn array_item_type_label(array_obj: &ObjectSchema) -> String {
             ObjectOrReference::Object(obj) => primitive_type_name(obj),
         },
         Schema::Boolean(_) => "boolean".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use serde_json::{Value, json};
+
+    use crate::writer::schema::render::render_schema_jsonc;
+    use crate::writer::testutil::spec_with_schemas;
+
+    /// Renders a `Thing` schema with `properties`, against a spec where `Thing` is the only
+    /// defined component schema.
+    fn render_thing(properties: Value) -> String {
+        let spec = spec_with_schemas(json!({
+            "Thing": {"type": "object", "properties": properties},
+        }));
+        let schema = serde_json::from_value(json!({"$ref": "#/components/schemas/Thing"}))
+            .expect("valid ref schema");
+        render_schema_jsonc(&schema, &spec, &HashSet::new())
+    }
+
+    #[test]
+    fn undefined_array_item_ref_renders_named_placeholder() {
+        let out = render_thing(json!({
+            "allocations": {
+                "type": "array",
+                "items": {"$ref": "#/components/schemas/AppFeeAllocation"},
+            },
+        }));
+        assert!(
+            out.contains("\"allocations\": [  // array of AppFeeAllocation, optional"),
+            "missing array type label in:\n{out}"
+        );
+        assert!(
+            out.contains("{ /* AppFeeAllocation (not defined in this spec) */ }"),
+            "missing named placeholder in:\n{out}"
+        );
+        assert!(
+            !out.contains("null"),
+            "item should not render as null:\n{out}"
+        );
+    }
+
+    #[test]
+    fn undefined_property_ref_renders_named_placeholder() {
+        let out = render_thing(json!({
+            "buyer_currency_exchange": {"$ref": "#/components/schemas/CurrencyExchange"},
+        }));
+        assert!(
+            out.contains(
+                "\"buyer_currency_exchange\": { /* CurrencyExchange (not defined in this spec) */ }  // unresolved ref, optional"
+            ),
+            "missing named placeholder in:\n{out}"
+        );
+    }
+
+    #[test]
+    fn undefined_external_ref_keeps_full_path() {
+        let out = render_thing(json!({
+            "phone": {"$ref": "https://example.com/common.json#Phone"},
+        }));
+        assert!(
+            out.contains(
+                "{ /* https://example.com/common.json#Phone (not defined in this spec) */ }"
+            ),
+            "external ref should keep its full path in:\n{out}"
+        );
+    }
+
+    #[test]
+    fn array_without_items_still_renders_null() {
+        let out = render_thing(json!({"allocations": {"type": "array"}}));
+        assert!(
+            out.contains("\"allocations\": [  // array of any, optional"),
+            "missing array line in:\n{out}"
+        );
+        assert!(out.contains("null"), "expected null item in:\n{out}");
+    }
+
+    #[test]
+    fn defined_ref_still_expands_inline() {
+        let spec = spec_with_schemas(json!({
+            "Thing": {
+                "type": "object",
+                "properties": {"tag": {"$ref": "#/components/schemas/Tag"}},
+            },
+            "Tag": {"type": "object", "properties": {"name": {"type": "string"}}},
+        }));
+        let schema = serde_json::from_value(json!({"$ref": "#/components/schemas/Thing"}))
+            .expect("valid ref schema");
+        let out = render_schema_jsonc(&schema, &spec, &HashSet::new());
+        assert!(
+            out.contains("\"name\": \"string\""),
+            "resolvable ref should expand inline in:\n{out}"
+        );
+        assert!(
+            !out.contains("not defined in this spec"),
+            "resolvable ref should not use the placeholder in:\n{out}"
+        );
     }
 }

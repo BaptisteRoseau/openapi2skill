@@ -16,6 +16,18 @@ pub(crate) fn schema_ref_name(schema: &Schema) -> Option<&str> {
     ref_path.strip_prefix(SCHEMA_REF_PREFIX)
 }
 
+/// The raw `$ref` path a schema points at, wherever it points, or `None` when the
+/// schema is inline.
+pub(crate) fn ref_path_of(schema: &Schema) -> Option<&str> {
+    let Schema::Object(oor) = schema else {
+        return None;
+    };
+    match oor.as_ref() {
+        ObjectOrReference::Ref { ref_path, .. } => Some(ref_path),
+        ObjectOrReference::Object(_) => None,
+    }
+}
+
 /// The bare name to show for a `$ref` path, falling back to the whole path when it
 /// doesn't point into `#/components/schemas`.
 pub(crate) fn ref_display_name(ref_path: &str) -> &str {
@@ -51,6 +63,18 @@ mod tests {
     fn ref_name_none_for_non_schema_ref() {
         let s = schema(serde_json::json!({"$ref": "#/components/responses/NotFound"}));
         assert_eq!(schema_ref_name(&s), None);
+    }
+
+    #[test]
+    fn ref_path_of_returns_full_path_for_any_ref() {
+        let s = schema(serde_json::json!({"$ref": "https://example.com/c.json#Phone"}));
+        assert_eq!(ref_path_of(&s), Some("https://example.com/c.json#Phone"));
+    }
+
+    #[test]
+    fn ref_path_of_none_for_inline_schema() {
+        let s = schema(serde_json::json!({"type": "string"}));
+        assert_eq!(ref_path_of(&s), None);
     }
 
     #[test]

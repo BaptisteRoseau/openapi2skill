@@ -411,6 +411,40 @@ fn test_endpoint_full_url_defaults_to_spec_server() {
     );
 }
 
+/// Square's spec `$ref`s `AppFeeAllocation` and `CurrencyExchange` without ever defining them.
+/// Those refs must still render under their own name rather than collapsing to `null`.
+#[test]
+fn test_undefined_refs_render_named_placeholders() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out");
+    let output = run_binary("tests/assets/square.json", &out);
+    assert!(
+        output.status.success(),
+        "binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let request_md =
+        std::fs::read_to_string(out.join("schemas/create-payment-request.md")).unwrap();
+    assert!(
+        request_md.contains("\"app_fee_allocations\": [  // array of AppFeeAllocation, optional"),
+        "missing array type label in:\n{request_md}"
+    );
+    assert!(
+        request_md.contains("{ /* AppFeeAllocation (not defined in this spec) */ }"),
+        "undefined array item ref should render a named placeholder in:\n{request_md}"
+    );
+
+    let response_md =
+        std::fs::read_to_string(out.join("schemas/complete-payment-response.md")).unwrap();
+    assert!(
+        response_md.contains(
+            "\"buyer_currency_exchange\": { /* CurrencyExchange (not defined in this spec) */ }"
+        ),
+        "undefined property ref should render a named placeholder in:\n{response_md}"
+    );
+}
+
 #[test]
 fn test_no_auth_dir_when_no_schemes() {
     let tmp = tempfile::tempdir().unwrap();
