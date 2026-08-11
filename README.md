@@ -36,7 +36,8 @@ Options:
   -o, --output-dir <OUTPUT_DIR>  Output directory, also used as the name ok the skill when provided
   -v, --verbose                  Enable stdout output
   -f, --force                    Remove existing output directory
-      --server <URL>             Override the server URL(s) from the spec. Can be specified multiple times (e.g. `--server api.example.com --server https://staging.example.com`). If the URL has no scheme, `https://` is prepended automatically
+      --server <URL>             Override the server URL(s) from the spec. Can be specified multiple times (e.g. `--server api.example.com --server https://staging.example.com`). If the URL has no scheme, `https://` is prepended automatically. The override must include any base path the endpoints are relative to (e.g. `--server http://host:9090/api/v1`)
+      --token-env-var <NAME>     Name of the environment variable holding the API key, token or basic auth credentials (e.g. `--token-env-var TOKEN_API_MICROSOFT`). Rendered in the authentication files of every static credential scheme
   -h, --help                     Print help
   -V, --version                  Print version
 ```
@@ -52,6 +53,9 @@ openapi2skill https://petstore3.swagger.io/api/v3/openapi.json
 
 # Custom output directory
 openapi2skill petstore.yaml --output-dir my_skill
+
+# Point the agent at the environment variable holding the credentials
+openapi2skill petstore.yaml --token-env-var TOKEN_API_PETSTORE
 
 # Make it directly available to Claude Code
 openapi2skill https://petstore3.swagger.io/api/v3/openapi.json \

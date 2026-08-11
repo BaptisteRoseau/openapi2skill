@@ -27,6 +27,12 @@ pub struct CliConfig {
     /// `--server http://host:9090/api/v1`)
     #[arg(long, value_name = "URL")]
     pub server: Vec<String>,
+
+    /// Name of the environment variable holding the API key, token or basic auth credentials
+    /// (e.g. `--token-env-var TOKEN_API_MICROSOFT`). Rendered in the authentication files of
+    /// every static credential scheme.
+    #[arg(long, value_name = "NAME")]
+    pub token_env_var: Option<String>,
 }
 
 impl CliConfig {
@@ -48,6 +54,10 @@ impl CliConfig {
         for server in &self.server {
             parts.push("--server".to_string());
             parts.push(server.clone());
+        }
+        if let Some(var) = &self.token_env_var {
+            parts.push("--token-env-var".to_string());
+            parts.push(var.clone());
         }
 
         parts.join(" ")
@@ -105,6 +115,7 @@ mod tests {
             verbose: false,
             force: false,
             server: Vec::new(),
+            token_env_var: None,
         }
     }
 
@@ -124,9 +135,10 @@ mod tests {
         cfg.verbose = true;
         cfg.force = true;
         cfg.server = vec!["https://a.example.com".to_string()];
+        cfg.token_env_var = Some("TOKEN_API".to_string());
         assert_eq!(
             cfg.to_command_string("openapi2skill"),
-            "openapi2skill spec.json --output-dir my_skill --verbose --force --server https://a.example.com"
+            "openapi2skill spec.json --output-dir my_skill --verbose --force --server https://a.example.com --token-env-var TOKEN_API"
         );
     }
 }

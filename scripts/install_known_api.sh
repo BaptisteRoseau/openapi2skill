@@ -9,40 +9,29 @@
 # ############################################################
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-GIT_ROOT=$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)
-CSV_FILE="$GIT_ROOT/known_openapi.csv"
+source "$SCRIPT_DIR/known_api_csv.sh"
 
 output_dir() {
-    local name="$1"
-    echo "$GIT_ROOT/.claude/skills/$(echo "$name" | tr '[:upper:]' '[:lower:]')"
+    skill_dir "$1"
 }
 
 install_api() {
     local name="$1"
-    local url="$2"
-    openapi2skill "$url" --output-dir "$(output_dir "$name")"
+    local token_env_var="$2"
+    local url="$3"
+    local -a args=("$url" --output-dir "$(output_dir "$name")")
+    [[ -n "$token_env_var" ]] && args+=(--token-env-var "$token_env_var")
+    openapi2skill -f "${args[@]}"
     echo "Installed $name"
 }
 
-parse_csv() {
-    local -n _names=$1
-    local -n _urls=$2
-    while IFS=',' read -r name url; do
-        name="${name//$'\r'/}"
-        url="${url//$'\r'/}"
-        [[ "$name" == "name" || -z "$name" ]] && continue
-        _names+=("$name")
-        _urls+=("$url")
-    done < "$CSV_FILE"
-}
-
 run_parallel() {
-    local -a names=() urls=() pids=()
+    local -a names=() token_vars=() urls=() pids=()
 
-    parse_csv names urls
+    parse_csv names token_vars urls
 
     for i in "${!names[@]}"; do
-        install_api "${names[$i]}" "${urls[$i]}" &
+        install_api "${names[$i]}" "${token_vars[$i]}" "${urls[$i]}" &
         pids+=($!)
     done
 
@@ -51,17 +40,4 @@ run_parallel() {
     done
 }
 
-# run_parallel
-
-run() {
-    local -a names=() urls=() pids=()
-
-    parse_csv names urls
-
-    for i in "${!names[@]}"; do
-        echo Next is "${names[$i]}"
-        install_api "${names[$i]}" "${urls[$i]}"
-    done
-}
-
-run
+run_parallel

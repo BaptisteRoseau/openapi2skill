@@ -29,6 +29,7 @@ async fn main() -> Result<(), anyhow::Error> {
         manifest_raw: loaded.raw,
         manifest_extension: loaded.manifest_extension,
         command,
+        token_env_var: config.token_env_var.clone(),
     };
     openapi2skill(
         &loaded.spec,

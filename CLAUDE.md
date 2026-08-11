@@ -5,7 +5,7 @@ Rust CLI that converts an OpenAPI 3.x specification into a tree of markdown file
 ## Usage
 
 ```
-openapi2skill <path-or-url> [--output-dir <dir>]
+openapi2skill <path-or-url> [--output-dir <dir>] [--token-env-var <NAME>]
 ```
 
 `<path-or-url>` accepts a file path (`.json`, `.yaml`, `.yml`) or an HTTP/HTTPS URL. The output directory defaults to the snake_case title of the API (e.g. `swagger_petstore/`).

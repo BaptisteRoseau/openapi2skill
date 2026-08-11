@@ -23,6 +23,8 @@ pub struct GenerationContext {
     pub manifest_raw: String,
     pub manifest_extension: &'static str,
     pub command: String,
+    /// Environment variable holding the API credentials, surfaced in the authentication files.
+    pub token_env_var: Option<String>,
 }
 
 pub async fn openapi2skill(
@@ -59,10 +61,13 @@ pub async fn openapi2skill(
         command: generation.command,
     };
     let endpoint_writer = endpoint::Writer { servers_override };
+    let auth_writer = auth::Writer {
+        token_env_var: generation.token_env_var,
+    };
     let writers: &[&dyn CollectWrites] = &[
         &skill_writer,
         &manifest_writer,
-        &auth::Writer,
+        &auth_writer,
         &endpoint_writer,
         &schema::Writer,
     ];
