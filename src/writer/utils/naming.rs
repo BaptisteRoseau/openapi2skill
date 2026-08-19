@@ -90,9 +90,14 @@ pub(crate) fn to_snake_case(s: &str) -> String {
     separated_case(s, '_', char::is_alphanumeric)
 }
 
+fn is_character_unsafe(c: char) -> bool {
+    matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') || c.is_control()
+}
+
 pub(crate) fn camel_to_kebab(s: &str) -> String {
+    let filtered: String = s.chars().filter(|c| !is_character_unsafe(*c)).collect();
     let mut result = String::new();
-    for (i, c) in s.chars().enumerate() {
+    for (i, c) in filtered.chars().enumerate() {
         if c.is_uppercase() && i > 0 {
             result.push('-');
         }
@@ -104,7 +109,8 @@ pub(crate) fn camel_to_kebab(s: &str) -> String {
 fn path_to_slug(path: &str) -> String {
     path.split('/')
         .filter(|s| !s.is_empty())
-        .map(|seg| camel_to_kebab(seg.trim_start_matches('{').trim_end_matches('}')))
+        .map(|seg| camel_to_kebab(&seg.replace(['{', '}'], "")))
+        .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("-")
 }
@@ -250,6 +256,12 @@ mod tests {
         assert_eq!(camel_to_kebab("MyDTO"), "my-d-t-o");
     }
 
+    #[test]
+    fn camel_to_kebab_strips_windows_unsafe_chars() {
+        assert_eq!(camel_to_kebab("<upload_url>"), "upload_url");
+        assert_eq!(camel_to_kebab("Foo:Bar*Baz?"), "foo-bar-baz");
+    }
+
     // --- path_to_slug ---
 
     #[test]
@@ -270,6 +282,19 @@ mod tests {
     #[test]
     fn path_to_slug_root_is_empty() {
         assert_eq!(path_to_slug("/"), "");
+    }
+
+    #[test]
+    fn path_to_slug_strips_windows_unsafe_angle_brackets() {
+        assert_eq!(path_to_slug("/<upload_url>"), "upload_url");
+    }
+
+    #[test]
+    fn path_to_slug_strips_windows_unsafe_trailing_question_mark() {
+        assert_eq!(
+            path_to_slug("/v2/boards/{board_id}/groups/{group_id}?"),
+            "v2-boards-board_id-groups-group_id"
+        );
     }
 
     // --- endpoint_filename ---
