@@ -1,9 +1,9 @@
 # AudioAnalysisObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `AudioAnalysisObject` |
 
 ```jsonc

@@ -1,10 +1,11 @@
 # Installing openapi2skill
 
 Install `openapi2skill` with
-Cargo if available; otherwise download the latest prebuilt release binary on GitHub and place
+Cargo if available; otherwise download the latest prebuilt release binary on
+GitHub and place
 it under `~/.local/bin`.
 
-Source and releases: https://github.com/BaptisteRoseau/openapi2skill
+Source and releases: <https://github.com/BaptisteRoseau/openapi2skill>
 
 ## Check whether it is already installed
 
@@ -39,7 +40,8 @@ Use this when `cargo` is not available.
    ```
 
 2. Download and extract the asset matching your OS/architecture. Determine your
-   architecture with `uname -m` (`x86_64` → `amd64`, `aarch64`/`arm64` → `arm64`).
+   architecture with `uname -m` (`x86_64` → `amd64`, `aarch64`/`arm64` →
+   `arm64`).
 
    The release assets are named:
    - `openapi2skill-linux-amd64.tar.gz`
@@ -57,7 +59,8 @@ Use this when `cargo` is not available.
    install -m 700 openapi2skill ~/.local/bin/openapi2skill
    ```
 
-   Without `gh`, download the same asset from the latest release page with `curl -L`:
+   Without `gh`, download the same asset from the latest release page with `curl
+   -L`:
 
    ```bash
    mkdir -p ~/.local/bin /tmp/o2s && cd /tmp/o2s

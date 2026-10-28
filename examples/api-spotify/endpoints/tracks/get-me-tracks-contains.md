@@ -3,7 +3,7 @@
 > **Deprecated.** Avoid using this endpoint when an alternative exists.
 
 | | |
-|--|--|
+| --- | --- |
 | **Method** | `GET` |
 | **URL** | `/me/tracks/contains` |
 | **Full URL** | `https://api.spotify.com/v1/me/tracks/contains?ids=7ouMYWpwJ422jRcDASZB7P,4VqPOruhp5EdPBeR92t6lQ,2takcwOaAZWiXQijPHIx7B` |
@@ -14,8 +14,8 @@
 ### Query Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `ids` | string | Yes | - |
+| --- | --- | --- | --- |
+| `ids` | string | Yes | --- |
 
 ## Response 200
 
@@ -33,7 +33,8 @@ Array of booleans
 
 **Response Content-Type:** `application/json`
 
-Bad or expired token. This can happen if the user revoked a token or the access token has expired. You should re-authenticate the user.
+Bad or expired token. This can happen if the user revoked a token or the access
+token has expired. You should re-authenticate the user.
 
 ```jsonc
 {
@@ -45,7 +46,8 @@ Bad or expired token. This can happen if the user revoked a token or the access 
 
 **Response Content-Type:** `application/json`
 
-Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...). Unfortunately, re-authenticating the user won't help here.
+Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...).
+Unfortunately, re-authenticating the user won't help here.
 
 ```jsonc
 {
@@ -64,4 +66,3 @@ The app has exceeded its rate limits.
   "error": { /* [ErrorObject](../../schemas/error-object.md) */ }  // object, required
 }
 ```
-

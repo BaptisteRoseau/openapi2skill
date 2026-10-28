@@ -86,11 +86,11 @@ fn render_response(
         out.push_str(&format!("**Response Content-Type:** {types}\n\n"));
     }
     out.push_str(&desc_paragraph(resp.description.as_deref()));
-    out.push_str(&render_response_headers_table(&resp.headers, spec));
+    out.push_str(&render_response_headers_table(code, &resp.headers, spec));
     if let Some(schema) = preferred_schema(&resp.content) {
         out.push_str(&render_schema_block(schema, spec, multi_use));
     }
-    out.push_str(&render_response_links_table(&resp.links, spec));
+    out.push_str(&render_response_links_table(code, &resp.links, spec));
     out
 }
 

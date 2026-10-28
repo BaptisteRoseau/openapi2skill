@@ -105,9 +105,9 @@ fn render_metadata(
 ) -> String {
     let mut out = render_version_line(spec);
     if let Some(url) = source_url {
-        out.push_str(&format!("**Source:** {url}\n\n"));
+        out.push_str(&format!("**Source:** <{url}>\n\n"));
     }
-    out.push_str(&format!("**Generated with:** `{command}`\n\n"));
+    out.push_str(&format!("**Generated with:**\n\n```sh\n{command}\n```\n\n"));
     out.push_str(&render_servers_section(spec, servers_override));
     if let Some(ext) = &spec.external_docs {
         out.push_str(&format!(
@@ -128,7 +128,7 @@ fn render_version_line(spec: &OpenApiV3Spec) -> String {
         ));
     }
     if let Some(tos) = &spec.info.terms_of_service {
-        out.push_str(&format!(" | **Terms of Service:** {tos}"));
+        out.push_str(&format!(" | **Terms of Service:** <{tos}>"));
     }
     out.push_str("\n\n");
     out
@@ -139,7 +139,7 @@ fn labelled_link(label: Option<&str>, url: &str) -> String {
     match label {
         Some(label) if url.is_empty() => label.to_string(),
         Some(label) => format!("[{label}]({url})"),
-        None => url.to_string(),
+        None => format!("<{url}>"),
     }
 }
 
@@ -158,11 +158,11 @@ fn render_servers_section(spec: &OpenApiV3Spec, servers_override: &[String]) -> 
     if entries.is_empty() {
         return String::new();
     }
-    let mut out = "**Servers:**\n".to_string();
+    let mut out = "**Servers:**\n\n".to_string();
     for (url, description) in entries {
         match description {
-            Some(desc) => out.push_str(&format!("- {url} — {desc}\n")),
-            None => out.push_str(&format!("- {url}\n")),
+            Some(desc) => out.push_str(&format!("- <{url}> — {desc}\n")),
+            None => out.push_str(&format!("- <{url}>\n")),
         }
     }
     out.push('\n');
@@ -179,9 +179,9 @@ fn render_decription_and_navigation(description: &str, spec: &OpenApiV3Spec) -> 
     if !description.is_empty() {
         out.push_str(&format!("## API Description\n\n{description}\n\n"));
     }
-    out.push_str("## Navigation\n\nGiven your goal, read the relevant index.md file links bellow and subsequent file to the endpoints required to achieve your task.\nAvoid using `ls` and `grep`, use them only when after the indexes if they did not provide the information required, or if you have to search for a specific pattern.\nOnly follow markdown links references required to achieve your goal. The less files you read, the better.");
+    out.push_str("## Navigation\n\nGiven your goal, read the relevant index.md file links bellow and subsequent file to the endpoints required to achieve your task.\nAvoid using `ls` and `grep`, use them only when after the indexes if they did not provide the information required, or if you have to search for a specific pattern.\nOnly follow markdown links references required to achieve your goal. The less files you read, the better.\n\n");
     if has_deprecated_operations(spec) {
-        out.push_str("\n\nSome endpoints are marked as deprecated. Prefer non-deprecated alternatives when available.\n\n");
+        out.push_str("Some endpoints are marked as deprecated. Prefer non-deprecated alternatives when available.\n\n");
     }
     out
 }
@@ -215,7 +215,7 @@ fn render_manifest_section(manifest_filename: &str, source_url: Option<&str>) ->
         "\n## OpenAPI Manifest\n\nThe raw OpenAPI manifest is available at [`{manifest_filename}`](./{manifest_filename})"
     );
     if let Some(url) = source_url {
-        out.push_str(&format!(", fetched from {url}"));
+        out.push_str(&format!(", fetched from <{url}>"));
     }
     out.push_str(
         ". It is provided only for tools that require the raw spec — e.g. generating an SDK, a Swagger/OpenAPI client, or a fuzzer. Do **not** read it to navigate this API: the indexed markdown files above contain the same information organized for far fewer tokens.\n",
@@ -288,7 +288,7 @@ mod tests {
             "openapi2skill spec.json",
         );
         assert!(
-            out.contains("**Source:** https://example.com/spec.json"),
+            out.contains("**Source:** <https://example.com/spec.json>"),
             "expected source line in:\n{out}"
         );
     }
@@ -308,7 +308,7 @@ mod tests {
         let spec = minimal_spec(&[]);
         let out = render_metadata(&spec, &[], None, "openapi2skill spec.json --force");
         assert!(
-            out.contains("**Generated with:** `openapi2skill spec.json --force`"),
+            out.contains("```sh\nopenapi2skill spec.json --force\n```"),
             "expected generated-with line in:\n{out}"
         );
     }
@@ -330,7 +330,7 @@ mod tests {
     fn manifest_section_includes_source_when_present() {
         let out = render_manifest_section("openapi.yml", Some("https://example.com/spec.yml"));
         assert!(
-            out.contains("fetched from https://example.com/spec.yml"),
+            out.contains("fetched from <https://example.com/spec.yml>"),
             "expected source mention in:\n{out}"
         );
     }

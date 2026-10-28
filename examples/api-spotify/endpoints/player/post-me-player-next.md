@@ -1,7 +1,7 @@
 # POST /me/player/next
 
 | | |
-|--|--|
+| --- | --- |
 | **Method** | `POST` |
 | **URL** | `/me/player/next` |
 | **Full URL** | `https://api.spotify.com/v1/me/player/next` |
@@ -12,8 +12,8 @@
 ### Query Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `device_id` | string | No | - |
+| --- | --- | --- | --- |
+| `device_id` | string | No | --- |
 
 ## Response 204
 
@@ -23,7 +23,8 @@ Command sent
 
 **Response Content-Type:** `application/json`
 
-Bad or expired token. This can happen if the user revoked a token or the access token has expired. You should re-authenticate the user.
+Bad or expired token. This can happen if the user revoked a token or the access
+token has expired. You should re-authenticate the user.
 
 ```jsonc
 {
@@ -35,7 +36,8 @@ Bad or expired token. This can happen if the user revoked a token or the access 
 
 **Response Content-Type:** `application/json`
 
-Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...). Unfortunately, re-authenticating the user won't help here.
+Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...).
+Unfortunately, re-authenticating the user won't help here.
 
 ```jsonc
 {
@@ -54,4 +56,3 @@ The app has exceeded its rate limits.
   "error": { /* [ErrorObject](../../schemas/error-object.md) */ }  // object, required
 }
 ```
-

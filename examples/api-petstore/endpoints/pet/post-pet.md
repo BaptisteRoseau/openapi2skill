@@ -1,7 +1,7 @@
 # POST /pet
 
 | | |
-|--|--|
+| --- | --- |
 | **Method** | `POST` |
 | **URL** | `/pet` |
 | **Full URL** | `http://mypetstore.com/api/v1/pet` |
@@ -37,4 +37,3 @@
 ## Response 405
 
 Invalid input
-

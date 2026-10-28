@@ -1,9 +1,9 @@
 # ImageObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ImageObject` |
 
 ```jsonc

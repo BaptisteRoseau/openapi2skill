@@ -1,9 +1,9 @@
 # LinkedTrackObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `LinkedTrackObject` |
 
 ```jsonc

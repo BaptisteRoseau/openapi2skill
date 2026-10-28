@@ -1,9 +1,9 @@
 # AuthorObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `AuthorObject` |
 
 ```jsonc

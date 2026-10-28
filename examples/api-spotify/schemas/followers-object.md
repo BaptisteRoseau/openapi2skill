@@ -1,9 +1,9 @@
 # FollowersObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `FollowersObject` |
 
 ```jsonc

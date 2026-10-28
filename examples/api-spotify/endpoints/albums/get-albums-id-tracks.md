@@ -1,7 +1,7 @@
 # GET /albums/{id}/tracks
 
 | | |
-|--|--|
+| --- | --- |
 | **Method** | `GET` |
 | **URL** | `/albums/{id}/tracks` |
 | **Full URL** | `https://api.spotify.com/v1/albums/{id}/tracks` |
@@ -12,16 +12,16 @@
 ### Path Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | string | Yes | - |
+| --- | --- | --- | --- |
+| `id` | string | Yes | --- |
 
 ### Query Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `market` | string | No | - |
-| `limit` | integer (0..50) | No | - |
-| `offset` | integer | No | - |
+| --- | --- | --- | --- |
+| `market` | string | No | --- |
+| `limit` | integer (0..50) | No | --- |
+| `offset` | integer | No | --- |
 
 ## Response 200
 
@@ -73,7 +73,7 @@ Pages of tracks
         "uri": "string"  // string, optional, The [Spotify URI](/documentation/web-api/concepts/spotify-uris-ids) for the track.
       },
       "restrictions": {
-        "reason": "string"  // string, optional, The reason for the restriction. Supported values: - `market` - The content item is not available in the given market. - `product` - The content item is not available for the user's subscription type. - `explicit` - The content item is explicit and the user's account is set to not play explicit content.  Additional reasons may be added in the future. **Note**: If you use this field, make sure that your application safely handles unknown values.
+        "reason": "string"  // string, optional, The reason for the restriction. Supported values: \- `market` - The content item is not available in the given market. \- `product` - The content item is not available for the user's subscription type. \- `explicit` - The content item is explicit and the user's account is set to not play explicit content.  Additional reasons may be added in the future. \**Note**: If you use this field, make sure that your application safely handles unknown values.
       },
       "name": "string",  // string, optional, The name of the track.
       "preview_url": "string",  // string, optional, A URL to a 30 second preview (MP3 format) of the track.
@@ -90,7 +90,8 @@ Pages of tracks
 
 **Response Content-Type:** `application/json`
 
-Bad or expired token. This can happen if the user revoked a token or the access token has expired. You should re-authenticate the user.
+Bad or expired token. This can happen if the user revoked a token or the access
+token has expired. You should re-authenticate the user.
 
 ```jsonc
 {
@@ -102,7 +103,8 @@ Bad or expired token. This can happen if the user revoked a token or the access 
 
 **Response Content-Type:** `application/json`
 
-Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...). Unfortunately, re-authenticating the user won't help here.
+Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...).
+Unfortunately, re-authenticating the user won't help here.
 
 ```jsonc
 {
@@ -121,4 +123,3 @@ The app has exceeded its rate limits.
   "error": { /* [ErrorObject](../../schemas/error-object.md) */ }  // object, required
 }
 ```
-

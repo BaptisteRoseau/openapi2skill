@@ -1,9 +1,9 @@
 # CursorObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `CursorObject` |
 
 ```jsonc

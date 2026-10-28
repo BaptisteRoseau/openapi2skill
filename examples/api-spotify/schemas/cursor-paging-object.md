@@ -1,9 +1,9 @@
 # CursorPagingObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `CursorPagingObject` |
 
 ```jsonc

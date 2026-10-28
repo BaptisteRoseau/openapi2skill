@@ -91,7 +91,10 @@ impl CollectWrites for Writer {
             index_links.push((filename, name.clone()));
         }
 
-        writes.push(auth_dir.join("index.md"), build_index(&index_links));
+        writes.push(
+            auth_dir.join("index.md"),
+            build_index("Authentication", &index_links),
+        );
     }
 }
 

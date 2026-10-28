@@ -1,9 +1,9 @@
 # PagingSimplifiedAudiobookObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PagingAudiobookObject` |
 
 ```jsonc

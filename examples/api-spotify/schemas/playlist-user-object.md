@@ -1,9 +1,9 @@
 # PlaylistUserObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PlaylistUserObject` |
 
 ```jsonc

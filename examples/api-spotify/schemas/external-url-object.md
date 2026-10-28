@@ -1,9 +1,9 @@
 # ExternalUrlObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ExternalUrlObject` |
 
 ```jsonc

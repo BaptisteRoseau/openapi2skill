@@ -1,0 +1,13 @@
+{
+  // markdownlint's default rule set, with the carve-outs a generated API reference needs.
+  "default": true,
+
+  "MD013": {
+    // A parameter description belongs on one line with its parameter, and a jsonc payload
+    // comment on one line with its field, so neither can be wrapped at 80 columns.
+    "tables": false,
+    "code_blocks": false,
+    // A heading is a single line: an operation path or a tag name cannot be wrapped either.
+    "headings": false
+  }
+}

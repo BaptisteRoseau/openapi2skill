@@ -1,9 +1,9 @@
 # DeviceObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `DeviceObject` |
 
 ```jsonc

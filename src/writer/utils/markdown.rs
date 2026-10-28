@@ -24,7 +24,7 @@ impl Table {
     pub(crate) fn row<S: AsRef<str>>(&mut self, cells: &[S]) {
         let joined: String = cells
             .iter()
-            .map(|cell| format!(" {} |", cell.as_ref()))
+            .map(|cell| padded_cell(cell.as_ref()))
             .collect();
         self.rows.push(format!("|{joined}\n"));
     }
@@ -37,9 +37,8 @@ impl Table {
             out.push('|');
         }
         out.push_str("\n|");
-        for cell in &self.header_cells {
-            out.push_str(&"-".repeat(cell.len().max(2)));
-            out.push('|');
+        for _ in &self.header_cells {
+            out.push_str(" --- |");
         }
         out.push('\n');
         out.extend(self.rows);
@@ -48,14 +47,55 @@ impl Table {
     }
 }
 
-/// Collapses newlines to spaces and trims a spec description for markdown output.
-pub(crate) fn normalize_desc(s: &str) -> String {
-    s.replace('\n', " ").trim().to_string()
+/// Wraps a cell in the single space of markdownlint's `compact` table column style,
+/// escaping the pipes that would otherwise open a new column (MD056).
+fn padded_cell(cell: &str) -> String {
+    let cell = balanced_backticks(&cell.replace('|', "\\|"));
+    if cell.is_empty() {
+        " |".to_string()
+    } else {
+        format!(" {cell} |")
+    }
 }
 
-/// Renders a description as its own paragraph, or nothing when absent or blank.
+/// Escapes a cell's backticks when they do not pair up, so a stray one cannot open a code
+/// span that swallows the next column separator.
+fn balanced_backticks(cell: &str) -> String {
+    if cell.matches('`').count().is_multiple_of(2) {
+        cell.to_string()
+    } else {
+        cell.replace('`', "\\`")
+    }
+}
+
+/// Flattens a spec description onto the single line a table cell has room for: block
+/// markup that would be read as inline markup once the newlines are gone gets escaped.
+pub(crate) fn normalize_desc(s: &str) -> String {
+    s.lines()
+        .map(escape_block_markers)
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .to_string()
+}
+
+/// Escapes the list bullet, heading or quote marker opening a line, which only means what
+/// it means at the start of a line.
+fn escape_block_markers(line: &str) -> String {
+    let trimmed = line.trim_start();
+    let marker_len = trimmed
+        .find(|c: char| !matches!(c, '-' | '*' | '+' | '>' | '#'))
+        .unwrap_or(trimmed.len());
+    if marker_len == 0 {
+        return trimmed.to_string();
+    }
+    format!("\\{trimmed}")
+}
+
+/// Renders a description as its own paragraph, or nothing when absent or blank. The
+/// description's own line structure is kept: it is markdown in its own right.
 pub(crate) fn desc_paragraph(description: Option<&str>) -> String {
-    match description.map(normalize_desc) {
+    match description.map(str::trim) {
         Some(desc) if !desc.is_empty() => format!("{desc}\n\n"),
         _ => String::new(),
     }
@@ -69,13 +109,14 @@ pub(crate) fn desc_cell(description: Option<&str>) -> String {
     }
 }
 
-pub(crate) fn build_index(links: &[(String, String)]) -> String {
-    links
+/// Renders an index file: a top-level heading followed by one bullet link per entry.
+pub(crate) fn build_index(title: &str, links: &[(String, String)]) -> String {
+    let bullets = links
         .iter()
         .map(|(file, name)| format!("- [{name}](./{file})"))
         .collect::<Vec<_>>()
-        .join("\n")
-        + "\n"
+        .join("\n");
+    format!("# {title}\n\n{bullets}\n")
 }
 
 #[cfg(test)]
@@ -87,10 +128,7 @@ mod tests {
     #[test]
     fn table_header_separator_matches_header_width() {
         let table = Table::new(&["Extension", "Value"]);
-        assert_eq!(
-            table.finish(),
-            "| Extension | Value |\n|-----------|-------|\n\n"
-        );
+        assert_eq!(table.finish(), "| Extension | Value |\n| --- | --- |\n\n");
     }
 
     #[test]
@@ -99,7 +137,7 @@ mod tests {
         table.row(&["`X-Key`", "Your API key"]);
         assert_eq!(
             table.finish(),
-            "| Header | Value |\n|--------|-------|\n| `X-Key` | Your API key |\n\n"
+            "| Header | Value |\n| --- | --- |\n| `X-Key` | Your API key |\n\n"
         );
     }
 
@@ -107,7 +145,10 @@ mod tests {
     fn table_unlabeled_uses_blank_header() {
         let mut table = Table::unlabeled(2);
         table.row(&["**Method**", "`GET`"]);
-        assert_eq!(table.finish(), "| | |\n|--|--|\n| **Method** | `GET` |\n\n");
+        assert_eq!(
+            table.finish(),
+            "| | |\n| --- | --- |\n| **Method** | `GET` |\n\n"
+        );
     }
 
     #[test]
@@ -140,6 +181,21 @@ mod tests {
     }
 
     #[test]
+    fn normalize_desc_escapes_a_flattened_bullet() {
+        assert_eq!(
+            normalize_desc("cases:\n* one\n* two"),
+            "cases: \\* one \\* two"
+        );
+    }
+
+    #[test]
+    fn table_cell_escapes_pipes() {
+        let mut table = Table::new(&["A"]);
+        table.row(&["a | b"]);
+        assert!(table.finish().contains("| a \\| b |"));
+    }
+
+    #[test]
     fn normalize_desc_empty_string_stays_empty() {
         assert_eq!(normalize_desc(""), "");
     }
@@ -167,8 +223,8 @@ mod tests {
     }
 
     #[test]
-    fn desc_paragraph_normalizes_newlines() {
-        assert_eq!(desc_paragraph(Some("a\nb")), "a b\n\n");
+    fn desc_paragraph_keeps_the_description_line_structure() {
+        assert_eq!(desc_paragraph(Some("a\nb")), "a\nb\n\n");
     }
 
     // --- desc_cell ---
@@ -197,13 +253,13 @@ mod tests {
             ("tag.md".to_string(), "Tag".to_string()),
         ];
         assert_eq!(
-            build_index(&links),
-            "- [Pet](./pet.md)\n- [Tag](./tag.md)\n"
+            build_index("Schemas", &links),
+            "# Schemas\n\n- [Pet](./pet.md)\n- [Tag](./tag.md)\n"
         );
     }
 
     #[test]
-    fn build_index_empty_is_just_newline() {
-        assert_eq!(build_index(&[]), "\n");
+    fn build_index_empty_is_just_the_heading() {
+        assert_eq!(build_index("Schemas", &[]), "# Schemas\n\n\n");
     }
 }

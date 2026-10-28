@@ -1,7 +1,7 @@
 # GET /pet/findByStatus/singleExample
 
 | | |
-|--|--|
+| --- | --- |
 | **Method** | `GET` |
 | **URL** | `/pet/findByStatus/singleExample` |
 | **Full URL** | `http://mypetstore.com/api/v1/pet/findByStatus/singleExample?status=string` |
@@ -13,7 +13,7 @@
 ### Query Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
+| --- | --- | --- | --- |
 | `status` | array | Yes | Status values that need to be considered for filter |
 
 ## Response 200
@@ -48,4 +48,3 @@ successful operation
 ## Response 400
 
 Invalid status value
-

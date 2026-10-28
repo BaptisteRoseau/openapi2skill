@@ -1,9 +1,9 @@
 # ExternalIdObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ExternalIdObject` |
 
 ```jsonc

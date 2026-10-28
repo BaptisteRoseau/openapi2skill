@@ -1,9 +1,9 @@
 # PrivateUserObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PrivateUserObject` |
 
 ```jsonc

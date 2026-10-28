@@ -35,7 +35,10 @@ impl CollectWrites for Writer {
             index_links.push((filename, name.clone()));
         }
 
-        writes.push(schema_dir.join("index.md"), build_index(&index_links));
+        writes.push(
+            schema_dir.join("index.md"),
+            build_index("Schemas", &index_links),
+        );
     }
 }
 

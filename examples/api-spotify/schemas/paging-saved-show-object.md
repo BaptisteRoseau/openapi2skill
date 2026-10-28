@@ -1,9 +1,9 @@
 # PagingSavedShowObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PagingShowObject` |
 
 ```jsonc

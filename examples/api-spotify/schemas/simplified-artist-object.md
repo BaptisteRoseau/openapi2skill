@@ -1,9 +1,9 @@
 # SimplifiedArtistObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `SimplifiedArtistObject` |
 
 ```jsonc

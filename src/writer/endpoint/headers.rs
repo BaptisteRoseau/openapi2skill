@@ -8,6 +8,7 @@ use super::params::render_param_type;
 use crate::writer::utils::{Table, desc_cell};
 
 pub(super) fn render_response_headers_table(
+    status: &str,
     headers: &Map<String, ObjectOrReference<Header>>,
     spec: &OpenApiV3Spec,
 ) -> String {
@@ -29,7 +30,7 @@ pub(super) fn render_response_headers_table(
             desc_cell(header.description.as_deref()),
         ]);
     }
-    format!("### Response Headers\n\n{}", table.finish())
+    format!("### Response Headers ({status})\n\n{}", table.finish())
 }
 
 #[cfg(test)]
@@ -43,7 +44,7 @@ mod tests {
     fn empty_headers_returns_empty_string() {
         let headers: Map<String, ObjectOrReference<Header>> = Map::new();
         let spec = empty_spec();
-        assert_eq!(render_response_headers_table(&headers, &spec), "");
+        assert_eq!(render_response_headers_table("200", &headers, &spec), "");
     }
 
     #[test]
@@ -59,7 +60,7 @@ mod tests {
             ObjectOrReference::Object(header),
         );
         let spec = empty_spec();
-        let result = render_response_headers_table(&headers, &spec);
+        let result = render_response_headers_table("200", &headers, &spec);
         assert!(result.contains("### Response Headers"));
         assert!(result.contains("| `X-Rate-Limit` | integer | Requests per minute allowed |"));
     }
@@ -71,7 +72,7 @@ mod tests {
         let mut headers: Map<String, ObjectOrReference<Header>> = Map::new();
         headers.insert("Retry-After".to_string(), ObjectOrReference::Object(header));
         let spec = empty_spec();
-        let result = render_response_headers_table(&headers, &spec);
+        let result = render_response_headers_table("200", &headers, &spec);
         assert!(result.contains("| `Retry-After` | integer | - |"));
     }
 
@@ -82,7 +83,7 @@ mod tests {
         let mut headers: Map<String, ObjectOrReference<Header>> = Map::new();
         headers.insert("X-Custom".to_string(), ObjectOrReference::Object(header));
         let spec = empty_spec();
-        let result = render_response_headers_table(&headers, &spec);
+        let result = render_response_headers_table("200", &headers, &spec);
         assert!(result.contains("| `X-Custom` | string | Some header |"));
     }
 }

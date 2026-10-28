@@ -1,9 +1,9 @@
 # ChapterObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ChapterObject` |
 
 ```jsonc
@@ -43,7 +43,7 @@
   "type": "episode",  // string, required, enum: "episode", The object type.
   "uri": "spotify:episode:0zLhl3WsOCQHbe1BPTiHgr",  // string, required, The [Spotify URI](/documentation/web-api/concepts/spotify-uris-ids) for the chapter.
   "restrictions": {
-    "reason": "string"  // string, optional, The reason for the restriction. Supported values: - `market` - The content item is not available in the given market. - `product` - The content item is not available for the user's subscription type. - `explicit` - The content item is explicit and the user's account is set to not play explicit content. - `payment_required` - Payment is required to play the content item.  Additional reasons may be added in the future. **Note**: If you use this field, make sure that your application safely handles unknown values.
+    "reason": "string"  // string, optional, The reason for the restriction. Supported values: \- `market` - The content item is not available in the given market. \- `product` - The content item is not available for the user's subscription type. \- `explicit` - The content item is explicit and the user's account is set to not play explicit content. \- `payment_required` - Payment is required to play the content item.  Additional reasons may be added in the future. \**Note**: If you use this field, make sure that your application safely handles unknown values.
   },
   "audiobook": {
     "authors": [  // array of AuthorObject, required

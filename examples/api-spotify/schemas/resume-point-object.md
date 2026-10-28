@@ -1,9 +1,9 @@
 # ResumePointObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ResumePointObject` |
 
 ```jsonc

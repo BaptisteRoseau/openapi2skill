@@ -1,9 +1,9 @@
 # SimplifiedAlbumObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `SimplifiedAlbumObject` |
 
 ```jsonc

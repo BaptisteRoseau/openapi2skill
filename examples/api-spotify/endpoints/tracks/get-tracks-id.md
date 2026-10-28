@@ -1,7 +1,7 @@
 # GET /tracks/{id}
 
 | | |
-|--|--|
+| --- | --- |
 | **Method** | `GET` |
 | **URL** | `/tracks/{id}` |
 | **Full URL** | `https://api.spotify.com/v1/tracks/{id}` |
@@ -12,14 +12,14 @@
 ### Path Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `id` | string | Yes | - |
+| --- | --- | --- | --- |
+| `id` | string | Yes | --- |
 
 ### Query Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `market` | string | No | - |
+| --- | --- | --- | --- |
+| `market` | string | No | --- |
 
 ## Response 200
 
@@ -99,7 +99,7 @@ A track
   "is_playable": false,  // boolean, optional, Part of the response when [Track Relinking](/documentation/web-api/concepts/track-relinking) is applied. If `true`, the track is playable in the given market. Otherwise `false`.
   "linked_from": null,  // object, optional, Part of the response when [Track Relinking](/documentation/web-api/concepts/track-relinking) is applied, and the requested track has been replaced with different track. The track in the `linked_from` object contains information about the originally requested track.
   "restrictions": {
-    "reason": "string"  // string, optional, The reason for the restriction. Supported values: - `market` - The content item is not available in the given market. - `product` - The content item is not available for the user's subscription type. - `explicit` - The content item is explicit and the user's account is set to not play explicit content.  Additional reasons may be added in the future. **Note**: If you use this field, make sure that your application safely handles unknown values.
+    "reason": "string"  // string, optional, The reason for the restriction. Supported values: \- `market` - The content item is not available in the given market. \- `product` - The content item is not available for the user's subscription type. \- `explicit` - The content item is explicit and the user's account is set to not play explicit content.  Additional reasons may be added in the future. \**Note**: If you use this field, make sure that your application safely handles unknown values.
   },
   "name": "string",  // string, optional, The name of the track.
   "popularity": 0,  // integer, optional, The popularity of the track. The value will be between 0 and 100, with 100 being the most popular.<br/>The popularity of a track is a value between 0 and 100, with 100 being the most popular. The popularity is calculated by algorithm and is based, in the most part, on the total number of plays the track has had and how recent those plays are.<br/>Generally speaking, songs that are being played a lot now will have a higher popularity than songs that were played a lot in the past. Duplicate tracks (e.g. the same track from a single and an album) are rated independently. Artist and album popularity is derived mathematically from track popularity. _**Note**: the popularity value may lag actual popularity by a few days: the value is not updated in real time._
@@ -115,7 +115,8 @@ A track
 
 **Response Content-Type:** `application/json`
 
-Bad or expired token. This can happen if the user revoked a token or the access token has expired. You should re-authenticate the user.
+Bad or expired token. This can happen if the user revoked a token or the access
+token has expired. You should re-authenticate the user.
 
 ```jsonc
 {
@@ -127,7 +128,8 @@ Bad or expired token. This can happen if the user revoked a token or the access 
 
 **Response Content-Type:** `application/json`
 
-Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...). Unfortunately, re-authenticating the user won't help here.
+Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...).
+Unfortunately, re-authenticating the user won't help here.
 
 ```jsonc
 {
@@ -146,4 +148,3 @@ The app has exceeded its rate limits.
   "error": { /* [ErrorObject](../../schemas/error-object.md) */ }  // object, required
 }
 ```
-

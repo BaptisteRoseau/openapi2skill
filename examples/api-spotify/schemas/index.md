@@ -1,3 +1,5 @@
+# Schemas
+
 - [LinkedTrackObject](./linked-track-object.md)
 - [TrackRestrictionObject](./track-restriction-object.md)
 - [AlbumRestrictionObject](./album-restriction-object.md)

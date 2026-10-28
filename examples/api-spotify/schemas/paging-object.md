@@ -1,9 +1,9 @@
 # PagingObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PagingObject` |
 
 ```jsonc

@@ -1,9 +1,9 @@
 # QueueObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `QueueObject` |
 
 ```jsonc

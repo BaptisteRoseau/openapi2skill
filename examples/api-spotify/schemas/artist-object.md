@@ -1,9 +1,9 @@
 # ArtistObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ArtistObject` |
 
 ```jsonc

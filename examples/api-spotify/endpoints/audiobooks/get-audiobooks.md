@@ -3,7 +3,7 @@
 > **Deprecated.** Avoid using this endpoint when an alternative exists.
 
 | | |
-|--|--|
+| --- | --- |
 | **Method** | `GET` |
 | **URL** | `/audiobooks` |
 | **Full URL** | `https://api.spotify.com/v1/audiobooks?ids=18yVqkdbdRvS24c0Ilj2ci,1HGw3J3NxZO1TP1BTtVhpZ,7iHfbu1YPACw6oZPAFJtqe` |
@@ -14,15 +14,17 @@
 ### Query Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `ids` | string | Yes | - |
-| `market` | string | No | - |
+| --- | --- | --- | --- |
+| `ids` | string | Yes | --- |
+| `market` | string | No | --- |
 
 ## Response 200
 
 **Response Content-Type:** `application/json`
 
-A set of audiobooks. If one of the requested audiobooks is unavailable then you'll find a `null` item in the `audiobooks` array where the audiobook object would otherwise be.
+A set of audiobooks. If one of the requested audiobooks is unavailable then
+you'll find a `null` item in the `audiobooks` array where the audiobook object
+would otherwise be.
 
 ```jsonc
 {
@@ -116,7 +118,7 @@ A set of audiobooks. If one of the requested audiobooks is unavailable then you'
             "type": "episode",  // string, required, enum: "episode", The object type.
             "uri": "spotify:episode:0zLhl3WsOCQHbe1BPTiHgr",  // string, required, The [Spotify URI](/documentation/web-api/concepts/spotify-uris-ids) for the chapter.
             "restrictions": {
-              "reason": "string"  // string, optional, The reason for the restriction. Supported values: - `market` - The content item is not available in the given market. - `product` - The content item is not available for the user's subscription type. - `explicit` - The content item is explicit and the user's account is set to not play explicit content. - `payment_required` - Payment is required to play the content item.  Additional reasons may be added in the future. **Note**: If you use this field, make sure that your application safely handles unknown values.
+              "reason": "string"  // string, optional, The reason for the restriction. Supported values: \- `market` - The content item is not available in the given market. \- `product` - The content item is not available for the user's subscription type. \- `explicit` - The content item is explicit and the user's account is set to not play explicit content. \- `payment_required` - Payment is required to play the content item.  Additional reasons may be added in the future. \**Note**: If you use this field, make sure that your application safely handles unknown values.
             }
           }
         ]
@@ -130,7 +132,8 @@ A set of audiobooks. If one of the requested audiobooks is unavailable then you'
 
 **Response Content-Type:** `application/json`
 
-Bad or expired token. This can happen if the user revoked a token or the access token has expired. You should re-authenticate the user.
+Bad or expired token. This can happen if the user revoked a token or the access
+token has expired. You should re-authenticate the user.
 
 ```jsonc
 {
@@ -142,7 +145,8 @@ Bad or expired token. This can happen if the user revoked a token or the access 
 
 **Response Content-Type:** `application/json`
 
-Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...). Unfortunately, re-authenticating the user won't help here.
+Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...).
+Unfortunately, re-authenticating the user won't help here.
 
 ```jsonc
 {
@@ -161,4 +165,3 @@ The app has exceeded its rate limits.
   "error": { /* [ErrorObject](../../schemas/error-object.md) */ }  // object, required
 }
 ```
-

@@ -1,9 +1,9 @@
 # ErrorObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ErrorObject` |
 
 ```jsonc

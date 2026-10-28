@@ -1,20 +1,29 @@
 # openapi2skill
 
-Convert an OpenAPI 3.x specification into an **AI Agent Skill** — a tree of index-linked markdown files an AI agent can navigate efficiently.
+Convert an OpenAPI 3.x specification into an **AI Agent Skill** — a tree of
+index-linked markdown files an AI agent can navigate efficiently.
 
-Built in Rust. Runs in milliseconds. Works on any spec reachable by file path or URL.
+Built in Rust. Runs in milliseconds. Works on any spec reachable by file path or
+URL.
 
 ## Overview
 
-`openapi2skill` parses an OpenAPI 3.x spec and writes a structured set of markdown files that Claude Code can use as a Skill. The output is designed for AI agents, not humans:
+`openapi2skill` parses an OpenAPI 3.x spec and writes a structured set of
+markdown files that Claude Code can use as a Skill. The output is designed for
+AI agents, not humans:
 
-- **Token-efficient** — each category and schema has its own file; agents load only what they need.
-- **Index-driven** — every directory has an `index.md` with bullet links, so agents can navigate the tree without scanning all files at once.
-- **Fast** — file I/O is parallelised with Tokio; generating a full Petstore skill takes under 10 ms.
+- **Token-efficient** — each category and schema has its own file; agents load
+  only what they need.
+- **Index-driven** — every directory has an `index.md` with bullet links, so
+  agents can navigate the tree without scanning all files at once.
+- **Fast** — file I/O is parallelised with Tokio; generating a full Petstore
+  skill takes under 10 ms.
 
 ## Installation
 
-**Download a pre-built binary** from the [latest GitHub release](https://github.com/BaptisteRoseau/openapi2skill/releases/latest) for your platform, then put it on your `PATH`.
+**Download a pre-built binary** from the [latest GitHub
+release](https://github.com/BaptisteRoseau/openapi2skill/releases/latest) for
+your platform, then put it on your `PATH`.
 
 **Or install from crates.io:**
 
@@ -66,9 +75,10 @@ openapi2skill https://petstore3.swagger.io/api/v3/openapi.json \
 
 ## Skill architecture
 
-The generated skill is a self-contained directory tree. Agents start at `SKILL.md` and follow links — they never need to load the whole tree at once.
+The generated skill is a self-contained directory tree. Agents start at
+`SKILL.md` and follow links — they never need to load the whole tree at once.
 
-```
+```text
 SKILL.md                         # frontmatter (name, description, allowed-tools) + links to indexes
 │
 ├── authentication/
@@ -89,23 +99,48 @@ SKILL.md                         # frontmatter (name, description, allowed-tools
     └── error.md
 ```
 
-Each endpoint file includes the HTTP method, URL, auth requirements, path/query parameters, a typed request body example, and typed response examples — all in a compact markdown + jsonc format.
+Each endpoint file includes the HTTP method, URL, auth requirements, path/query
+parameters, a typed request body example, and typed response examples — all in a
+compact markdown + jsonc format.
 
 Examples of generated skills can be found under [examples](./examples):
 
 - [Petstore](./examples/api-petstore)
 - [Spotify](examples/api-spotify)
 
+## Lint-clean output
+
+Generated markdown passes
+[markdownlint](https://github.com/DavidAnson/markdownlint)
+under the `.markdownlint.jsonc` shipped in this repository — the default rule
+set, with
+`MD013` (line length) off for tables, fenced code blocks and headings, which
+cannot be
+wrapped without breaking what they are. Descriptions taken from the spec are
+rewritten on
+the way out, so HTML, bare URLs and broken links from the original documentation
+site do
+not end up in the skill.
+
+To check a skill you generated:
+
+```bash
+markdownlint --config /path/to/openapi2skill/.markdownlint.jsonc ./my_api_skill
+```
+
 ## Troubleshooting
 
-If you encounter a warning or an error, feel free to open an issue in this repository, but always include the openapi.json link or file.
+If you encounter a warning or an error, feel free to open an issue in this
+repository, but always include the openapi.json link or file.
 
 ## Related Skills
 
 Usefull skills using this tool can be found under [skills](./skills):
 
-- [API Skill Generator](skills/api-skill-generator): Instructions on how to find then convert an Open API spec from the internet.
-    Just ask your AI agent "generate a skill to interract with Prometheus REST API",
+- [API Skill Generator](skills/api-skill-generator): Instructions on how to find
+  then convert an Open API spec from the internet.
+    Just ask your AI agent "generate a skill to interract with Prometheus REST
+    API",
     the agent handles the specification search and the conversion.
 
 To use them, simply copy `skills/*` under your `.agents/skills/*` folder.

@@ -1,9 +1,9 @@
 # SimplifiedAudiobookObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `SimplifiedAudiobookObject` |
 
 ```jsonc

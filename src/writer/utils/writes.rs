@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use oas3::OpenApiV3Spec;
 use tracing::info;
 
+use super::normalize_markdown;
+
 /// Accumulates the `(path, content)` pairs every writer produces, logging each as it lands.
 #[derive(Default)]
 pub(crate) struct Writes(Vec<(PathBuf, String)>);
@@ -10,6 +12,10 @@ pub(crate) struct Writes(Vec<(PathBuf, String)>);
 impl Writes {
     pub(crate) fn push(&mut self, path: PathBuf, content: String) {
         info!("Writing {path:?}");
+        let content = match path.extension().and_then(|e| e.to_str()) {
+            Some("md") => normalize_markdown(&content),
+            _ => content,
+        };
         self.0.push((path, content));
     }
 

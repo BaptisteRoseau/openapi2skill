@@ -1,9 +1,9 @@
 # DisallowsObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `DisallowsObject` |
 
 ```jsonc

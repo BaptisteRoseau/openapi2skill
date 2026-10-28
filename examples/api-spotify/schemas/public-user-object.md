@@ -1,9 +1,9 @@
 # PublicUserObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PublicUserObject` |
 
 ```jsonc

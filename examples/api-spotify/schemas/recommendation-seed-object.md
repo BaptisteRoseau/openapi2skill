@@ -1,9 +1,9 @@
 # RecommendationSeedObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `RecommendationSeedObject` |
 
 ```jsonc

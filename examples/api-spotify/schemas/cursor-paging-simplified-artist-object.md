@@ -1,9 +1,9 @@
 # CursorPagingSimplifiedArtistObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PagingArtistObject` |
 
 ```jsonc

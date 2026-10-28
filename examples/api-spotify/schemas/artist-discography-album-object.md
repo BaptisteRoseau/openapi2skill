@@ -1,9 +1,9 @@
 # ArtistDiscographyAlbumObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ArtistDiscographyAlbumObject` |
 
 ```jsonc

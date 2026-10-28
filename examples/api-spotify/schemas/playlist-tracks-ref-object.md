@@ -1,9 +1,9 @@
 # PlaylistTracksRefObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PlaylistTracksRefObject` |
 
 ```jsonc

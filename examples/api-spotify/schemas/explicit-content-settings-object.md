@@ -1,9 +1,9 @@
 # ExplicitContentSettingsObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ExplicitContentSettingsObject` |
 
 ```jsonc

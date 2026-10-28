@@ -1,9 +1,9 @@
 # PagingSimplifiedAlbumObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PagingAlbumObject` |
 
 ```jsonc

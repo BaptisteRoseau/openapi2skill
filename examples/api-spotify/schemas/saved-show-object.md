@@ -1,9 +1,9 @@
 # SavedShowObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `SavedShowObject` |
 
 ```jsonc

@@ -1,2 +1,3 @@
-- ~~[Get Available Markets
-](./get-markets.md)~~ *(deprecated)*
+# Markets endpoints
+
+- ~~[Get Available Markets](./get-markets.md)~~ *(deprecated)*

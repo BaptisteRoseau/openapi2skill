@@ -1,9 +1,9 @@
 # SimplifiedShowObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `SimplifiedShowObject` |
 
 ```jsonc

@@ -4,7 +4,8 @@ use oas3::OpenApiV3Spec;
 
 use super::{refs::collect_multi_use_schemas, render::render_endpoint};
 use crate::writer::utils::{
-    CollectWrites, Writes, category_label, effective_server_bases, endpoint_filename, op_category,
+    CollectWrites, Writes, category_label, effective_server_bases, endpoint_filename,
+    normalize_desc, op_category,
 };
 
 pub(in crate::writer) struct Writer {
@@ -36,14 +37,18 @@ impl CollectWrites for Writer {
         let endpoints_dir = dir.join("endpoints");
         let by_category = self.group_by_category(spec);
 
-        let top_index: String = by_category
+        let bullets: String = by_category
             .keys()
             .map(|slug| format!("- [{}](./{slug}/index.md)\n", category_label(slug)))
             .collect();
-        writes.push(endpoints_dir.join("index.md"), top_index);
+        writes.push(
+            endpoints_dir.join("index.md"),
+            format!("# Endpoints\n\n{bullets}"),
+        );
 
         for (cat_slug, endpoints) in by_category {
-            push_category_writes(&endpoints_dir.join(cat_slug), &endpoints, writes);
+            let title = category_label(&cat_slug);
+            push_category_writes(&endpoints_dir.join(cat_slug), &title, &endpoints, writes);
         }
     }
 }
@@ -61,7 +66,7 @@ impl Writer {
                 .or_default()
                 .push(Endpoint {
                     filename: endpoint_filename(method.as_str(), &path),
-                    summary: op.summary.as_deref().unwrap_or(path.as_str()).to_string(),
+                    summary: normalize_desc(op.summary.as_deref().unwrap_or(path.as_str())),
                     content: render_endpoint(
                         &path,
                         method.as_str(),
@@ -77,14 +82,16 @@ impl Writer {
     }
 }
 
-fn push_category_writes(cat_dir: &Path, endpoints: &[Endpoint], writes: &mut Writes) {
-    let index = endpoints
+fn push_category_writes(cat_dir: &Path, title: &str, endpoints: &[Endpoint], writes: &mut Writes) {
+    let bullets = endpoints
         .iter()
         .map(Endpoint::index_entry)
         .collect::<Vec<_>>()
-        .join("\n")
-        + "\n";
-    writes.push(cat_dir.join("index.md"), index);
+        .join("\n");
+    writes.push(
+        cat_dir.join("index.md"),
+        format!("# {title}\n\n{bullets}\n"),
+    );
 
     for endpoint in endpoints {
         writes.push(cat_dir.join(&endpoint.filename), endpoint.content.clone());

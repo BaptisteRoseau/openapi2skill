@@ -1,9 +1,9 @@
 # SimplifiedPlaylistObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `SimplifiedPlaylistObject` |
 
 ```jsonc

@@ -1,9 +1,9 @@
 # PagingPlaylistTrackObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PagingPlaylistTrackObject` |
 
 ```jsonc
@@ -28,7 +28,7 @@
       },
       "is_local": false,  // boolean, optional, Whether this track or episode is a [local file](/documentation/web-api/concepts/playlists/#local-files) or not.
       "item": null,  // any, optional, Information about the track or episode.
-      "track": null  // any, optional, **Deprecated:** Use `item` instead. Information about the track or episode.
+      "track": null  // any, optional, \**Deprecated:** Use `item` instead. Information about the track or episode.
     }
   ]
 }

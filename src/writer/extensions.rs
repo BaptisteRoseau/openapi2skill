@@ -17,7 +17,7 @@ pub(crate) fn render_extensions_table(extensions: &Map<String, Value>) -> String
     for (key, val) in rows {
         table.row(&[format!("`{key}`"), format!("`{val}`")]);
     }
-    format!("### Extensions\n\n{}", table.finish())
+    format!("## Extensions\n\n{}", table.finish())
 }
 
 fn scalar_display(v: &Value) -> Option<String> {
@@ -51,7 +51,7 @@ mod tests {
             ("x-flag", json!(true)),
         ]);
         let out = render_extensions_table(&m);
-        assert!(out.contains("### Extensions"));
+        assert!(out.contains("## Extensions"));
         assert!(out.contains("| `x-foo` | `bar` |"));
         assert!(out.contains("| `x-count` | `42` |"));
         assert!(out.contains("| `x-flag` | `true` |"));

@@ -1,3 +1,5 @@
+# Endpoints
+
 - [Albums endpoints](./albums/index.md)
 - [Artists endpoints](./artists/index.md)
 - [Audiobooks endpoints](./audiobooks/index.md)

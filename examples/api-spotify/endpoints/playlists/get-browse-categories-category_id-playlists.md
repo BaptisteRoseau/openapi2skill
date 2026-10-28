@@ -3,7 +3,7 @@
 > **Deprecated.** Avoid using this endpoint when an alternative exists.
 
 | | |
-|--|--|
+| --- | --- |
 | **Method** | `GET` |
 | **URL** | `/browse/categories/{category_id}/playlists` |
 | **Full URL** | `https://api.spotify.com/v1/browse/categories/{category_id}/playlists` |
@@ -14,15 +14,15 @@
 ### Path Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `category_id` | string | Yes | - |
+| --- | --- | --- | --- |
+| `category_id` | string | Yes | --- |
 
 ### Query Parameters
 
 | Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `limit` | integer (0..50) | No | - |
-| `offset` | integer | No | - |
+| --- | --- | --- | --- |
+| `limit` | integer (0..50) | No | --- |
+| `offset` | integer | No | --- |
 
 ## Response 200
 
@@ -30,13 +30,15 @@
 
 A paged set of playlists
 
-See [PagingFeaturedPlaylistObject](../../schemas/paging-featured-playlist-object.md)
+See
+[PagingFeaturedPlaylistObject](../../schemas/paging-featured-playlist-object.md)
 
 ## Response 401
 
 **Response Content-Type:** `application/json`
 
-Bad or expired token. This can happen if the user revoked a token or the access token has expired. You should re-authenticate the user.
+Bad or expired token. This can happen if the user revoked a token or the access
+token has expired. You should re-authenticate the user.
 
 ```jsonc
 {
@@ -48,7 +50,8 @@ Bad or expired token. This can happen if the user revoked a token or the access 
 
 **Response Content-Type:** `application/json`
 
-Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...). Unfortunately, re-authenticating the user won't help here.
+Bad OAuth request (wrong consumer key, bad nonce, expired timestamp...).
+Unfortunately, re-authenticating the user won't help here.
 
 ```jsonc
 {
@@ -67,4 +70,3 @@ The app has exceeded its rate limits.
   "error": { /* [ErrorObject](../../schemas/error-object.md) */ }  // object, required
 }
 ```
-

@@ -1,9 +1,9 @@
 # CurrentlyPlayingContextObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `CurrentlyPlayingContextObject` |
 
 ```jsonc

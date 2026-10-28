@@ -1,9 +1,9 @@
 # PagingPlaylistObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `PagingPlaylistObject` |
 
 ```jsonc

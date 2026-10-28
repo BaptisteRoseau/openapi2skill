@@ -1,9 +1,9 @@
 # CopyrightObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `CopyrightObject` |
 
 ```jsonc

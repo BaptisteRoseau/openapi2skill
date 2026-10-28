@@ -1,9 +1,9 @@
 # ContextObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `ContextObject` |
 
 ```jsonc

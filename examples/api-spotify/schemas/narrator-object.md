@@ -1,9 +1,9 @@
 # NarratorObject
 
-### Extensions
+## Extensions
 
 | Extension | Value |
-|-----------|-------|
+| --- | --- |
 | `spotify-docs-type` | `NarratorObject` |
 
 ```jsonc

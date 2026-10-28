@@ -7,6 +7,7 @@ use tracing::warn;
 use crate::writer::utils::{Table, desc_cell};
 
 pub(super) fn render_response_links_table(
+    status: &str,
     links: &Map<String, ObjectOrReference<Link>>,
     spec: &OpenApiV3Spec,
 ) -> String {
@@ -21,7 +22,7 @@ pub(super) fn render_response_links_table(
         };
         table.row(&link_row_cells(name, &link));
     }
-    format!("### Links\n\n{}", table.finish())
+    format!("### Links ({status})\n\n{}", table.finish())
 }
 
 fn resolve_link(link_ref: &ObjectOrReference<Link>, spec: &OpenApiV3Spec) -> Option<Link> {
@@ -81,7 +82,7 @@ mod tests {
     fn empty_links_returns_empty_string() {
         let links: Map<String, ObjectOrReference<Link>> = Map::new();
         let spec = empty_spec();
-        assert_eq!(render_response_links_table(&links, &spec), "");
+        assert_eq!(render_response_links_table("200", &links, &spec), "");
     }
 
     #[test]
@@ -97,7 +98,7 @@ mod tests {
         let mut links: Map<String, ObjectOrReference<Link>> = Map::new();
         links.insert("address".to_string(), ObjectOrReference::Object(link));
         let spec = empty_spec();
-        let result = render_response_links_table(&links, &spec);
+        let result = render_response_links_table("200", &links, &spec);
         assert!(result.contains("### Links"));
         assert!(result.contains("| `address` | `getUserByUsername` | username: $response.body#/username | Gets user address |"));
     }
@@ -114,7 +115,7 @@ mod tests {
             ObjectOrReference::Object(link),
         );
         let spec = empty_spec();
-        let result = render_response_links_table(&links, &spec);
+        let result = render_response_links_table("200", &links, &spec);
         assert!(result.contains("| `userRepositories` | `listRepos` | - | - |"));
     }
 
@@ -130,7 +131,7 @@ mod tests {
         let mut links: Map<String, ObjectOrReference<Link>> = Map::new();
         links.insert("userRef".to_string(), ObjectOrReference::Object(link));
         let spec = empty_spec();
-        let result = render_response_links_table(&links, &spec);
+        let result = render_response_links_table("200", &links, &spec);
         assert!(result.contains("| `userRef` | `#/paths/~1users~1{username}/get` |"));
     }
 }
