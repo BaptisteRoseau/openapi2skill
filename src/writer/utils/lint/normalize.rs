@@ -16,6 +16,7 @@ pub(crate) fn normalize_markdown(content: &str) -> String {
     let raw = fence_indented_code(raw);
     let raw = join_paragraphs(raw);
     let lines = classify(raw);
+    let lines = with_heading_increments(lines);
     let lines = with_block_spacing(lines);
     let lines = label_standalone_emphasis(lines);
     render(&lines)
@@ -361,8 +362,31 @@ fn with_language(fence: &str) -> String {
     }
 }
 
-/// Inserts the blank lines markdownlint wants around headings, fenced blocks, lists and
-/// thematic breaks (MD022, MD031, MD032), and collapses runs of blanks to one (MD012).
+/// Re-levels headings so each one is at most one level below the heading it nests under
+/// (MD001).
+fn with_heading_increments(mut lines: Vec<Line>) -> Vec<Line> {
+    // (source level, rendered level) of each open heading.
+    let mut open: Vec<(usize, usize)> = Vec::new();
+    for line in lines.iter_mut().filter(|l| l.kind == Kind::Heading) {
+        let trimmed = line.text.trim_start();
+        let level = trimmed.len() - trimmed.trim_start_matches('#').len();
+        while open.last().is_some_and(|&(source, _)| source >= level) {
+            open.pop();
+        }
+        let rendered = open
+            .last()
+            .map_or(level, |&(_, parent)| level.min(parent + 1));
+        open.push((level, rendered));
+        if rendered != level {
+            line.text = format!("{}{}", "#".repeat(rendered), &trimmed[level..]);
+        }
+    }
+    lines
+}
+
+/// Inserts the blank lines markdownlint wants around headings, fenced blocks, lists, tables
+/// and thematic breaks (MD022, MD031, MD032, MD058), and collapses runs of blanks to one
+/// (MD012).
 fn with_block_spacing(lines: Vec<Line>) -> Vec<Line> {
     let mut out: Vec<Line> = Vec::with_capacity(lines.len());
     let mut iter = lines.into_iter().peekable();
@@ -400,7 +424,9 @@ fn needs_blank_before(line: &Line, previous: Option<&Line>) -> bool {
         Kind::Heading | Kind::FenceOpen | Kind::ThematicBreak => true,
         // Only the first item of a list needs the blank line above it.
         Kind::ListItem => previous.kind != Kind::ListItem,
-        Kind::Prose | Kind::TableRow => previous.kind == Kind::ListItem,
+        // Only the first row of a table needs the blank line above it.
+        Kind::TableRow => previous.kind != Kind::TableRow,
+        Kind::Prose => matches!(previous.kind, Kind::ListItem | Kind::TableRow),
         _ => false,
     }
 }
@@ -412,7 +438,11 @@ fn needs_blank_after(kind: Kind, next: Option<&Line>) -> bool {
     if next.kind == Kind::Blank {
         return false;
     }
-    matches!(kind, Kind::Heading | Kind::ThematicBreak | Kind::FenceClose)
+    match kind {
+        Kind::Heading | Kind::ThematicBreak | Kind::FenceClose => true,
+        Kind::TableRow => next.kind != Kind::TableRow,
+        _ => false,
+    }
 }
 
 /// A paragraph that is nothing but emphasis reads as a heading to markdownlint (MD036);
@@ -564,6 +594,18 @@ mod tests {
     }
 
     #[test]
+    fn inserts_one_blank_line_around_tables() {
+        assert_eq!(
+            normalize_markdown("intro\n| a |\n| --- |\noutro\n"),
+            "intro\n\n| a |\n| --- |\n\noutro\n"
+        );
+        assert_eq!(
+            normalize_markdown("intro\n\n| a |\n| --- |\n"),
+            "intro\n\n| a |\n| --- |\n"
+        );
+    }
+
+    #[test]
     fn inserts_blank_line_before_thematic_break() {
         assert_eq!(
             normalize_markdown("text\n\n---\nmore\n"),
@@ -599,6 +641,14 @@ mod tests {
         assert_eq!(
             normalize_markdown("## Authentication.\n"),
             "## Authentication\n"
+        );
+    }
+
+    #[test]
+    fn raises_headings_that_skip_a_level() {
+        assert_eq!(
+            normalize_markdown("# Title\n\n### A\n\n#### A.1\n\n### B\n"),
+            "# Title\n\n## A\n\n### A.1\n\n## B\n"
         );
     }
 
