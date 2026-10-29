@@ -20,6 +20,8 @@ URL. The output directory defaults to the snake_case title of the API (e.g.
 
 ```text
 SKILL.md                          ← frontmatter (name, description, allowed-tools) + links to indexes
+.markdownlint.jsonc               ← copy of the repository's markdownlint config
+openapi.{json,yml}                ← raw OpenAPI manifest
 authentication/
   index.md                        ← bullet links to auth method files
   api_key.md / oauth.md / …       ← one file per security scheme

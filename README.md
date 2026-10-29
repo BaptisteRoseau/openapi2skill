@@ -80,6 +80,8 @@ The generated skill is a self-contained directory tree. Agents start at
 
 ```text
 SKILL.md                         # frontmatter (name, description, allowed-tools) + links to indexes
+.markdownlint.jsonc              # markdownlint config the generated markdown complies with
+openapi.json                     # raw OpenAPI manifest, for tooling that needs the spec
 │
 ├── authentication/
 │   ├── index.md                 # bullet links to each auth scheme file
@@ -122,10 +124,11 @@ the way out, so HTML, bare URLs and broken links from the original documentation
 site do
 not end up in the skill.
 
-To check a skill you generated:
+A copy of that `.markdownlint.jsonc` is written at the root of every generated
+skill, so checking it needs no extra configuration:
 
 ```bash
-markdownlint --config /path/to/openapi2skill/.markdownlint.jsonc ./my_api_skill
+markdownlint ./my_api_skill
 ```
 
 ## Troubleshooting

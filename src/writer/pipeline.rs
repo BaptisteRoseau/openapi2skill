@@ -13,7 +13,7 @@ use tracing::info;
 use crate::error::O2SError;
 
 use super::utils::{CollectWrites, Writes, infer_skill_name};
-use super::{auth, endpoint, manifest, schema, skill};
+use super::{auth, endpoint, manifest, markdownlint, schema, skill};
 
 /// Everything about how and where this skill was generated, as opposed to the spec content
 /// itself: where the spec came from, its verbatim text for the manifest file, and the command
@@ -67,6 +67,7 @@ pub async fn openapi2skill(
     let writers: &[&dyn CollectWrites] = &[
         &skill_writer,
         &manifest_writer,
+        &markdownlint::Writer,
         &auth_writer,
         &endpoint_writer,
         &schema::Writer,

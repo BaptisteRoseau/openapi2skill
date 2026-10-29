@@ -5,6 +5,7 @@ mod auth;
 mod endpoint;
 pub(crate) mod extensions;
 mod manifest;
+mod markdownlint;
 mod pipeline;
 mod schema;
 mod skill;

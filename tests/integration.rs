@@ -44,6 +44,10 @@ fn test_spec_writes_successfully(
         out.join(format!("openapi.{manifest_ext}")).exists(),
         "{path:?}: missing openapi.{manifest_ext} manifest"
     );
+    assert!(
+        out.join(".markdownlint.jsonc").exists(),
+        "{path:?}: missing .markdownlint.jsonc"
+    );
     assert_no_empty_schema(out.join("schemas"));
     assert_no_empty_schema(out.join("endpoints"));
     assert_no_invalid_jsonc(out.join("schemas"));
