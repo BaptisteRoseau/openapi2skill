@@ -464,3 +464,33 @@ fn test_no_auth_dir_when_no_schemes() {
         "authentication dir should not be created when no security schemes are defined"
     );
 }
+
+#[test]
+fn test_no_markdownlint_and_no_openapi_skip_their_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let out = tmp.path().join("out");
+    let output = run_binary_with_args(
+        "tests/assets/petstore.json",
+        &out,
+        &["--no-markdownlint", "--no-openapi"],
+    );
+    assert!(
+        output.status.success(),
+        "binary exited with failure:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(out.join("SKILL.md").exists(), "missing SKILL.md");
+    assert!(
+        !out.join(".markdownlint.jsonc").exists(),
+        ".markdownlint.jsonc should not be written"
+    );
+    assert!(
+        !out.join("openapi.json").exists(),
+        "openapi.json should not be written"
+    );
+    let skill_md = std::fs::read_to_string(out.join("SKILL.md")).unwrap();
+    assert!(
+        !skill_md.contains("OpenAPI Manifest"),
+        "SKILL.md should not mention a missing manifest:\n{skill_md}"
+    );
+}

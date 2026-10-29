@@ -25,6 +25,10 @@ pub struct GenerationContext {
     pub command: String,
     /// Environment variable holding the API credentials, surfaced in the authentication files.
     pub token_env_var: Option<String>,
+    /// Whether to copy `.markdownlint.jsonc` into the skill.
+    pub write_markdownlint: bool,
+    /// Whether to copy the raw manifest into the skill and link it from `SKILL.md`.
+    pub write_manifest: bool,
 }
 
 pub async fn openapi2skill(
@@ -57,21 +61,27 @@ pub async fn openapi2skill(
         name: skill_name,
         servers_override: servers_override.clone(),
         source_url: generation.source_url,
-        manifest_filename: manifest_writer.filename(),
+        manifest_filename: generation
+            .write_manifest
+            .then(|| manifest_writer.filename()),
         command: generation.command,
     };
     let endpoint_writer = endpoint::Writer { servers_override };
     let auth_writer = auth::Writer {
         token_env_var: generation.token_env_var,
     };
-    let writers: &[&dyn CollectWrites] = &[
+    let mut writers: Vec<&dyn CollectWrites> = vec![
         &skill_writer,
-        &manifest_writer,
-        &markdownlint::Writer,
         &auth_writer,
         &endpoint_writer,
         &schema::Writer,
     ];
+    if generation.write_manifest {
+        writers.push(&manifest_writer);
+    }
+    if generation.write_markdownlint {
+        writers.push(&markdownlint::Writer);
+    }
     for w in writers {
         w.collect_writes(spec, &dir, &mut writes);
     }

@@ -8,6 +8,7 @@ documentation set an AI agent can navigate efficiently.
 
 ```text
 openapi2skill <path-or-url> [--output-dir <dir>] [--token-env-var <NAME>]
+              [--no-markdownlint] [--no-openapi]
 ```
 
 `<path-or-url>` accepts a file path (`.json`, `.yaml`, `.yml`) or an HTTP/HTTPS

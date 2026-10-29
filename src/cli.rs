@@ -33,6 +33,14 @@ pub struct CliConfig {
     /// every static credential scheme.
     #[arg(long, value_name = "NAME")]
     pub token_env_var: Option<String>,
+
+    /// Do not copy the `.markdownlint.jsonc` config into the generated skill
+    #[arg(long, default_value_t = false)]
+    pub no_markdownlint: bool,
+
+    /// Do not copy the raw OpenAPI manifest into the generated skill
+    #[arg(long, default_value_t = false)]
+    pub no_openapi: bool,
 }
 
 impl CliConfig {
@@ -58,6 +66,12 @@ impl CliConfig {
         if let Some(var) = &self.token_env_var {
             parts.push("--token-env-var".to_string());
             parts.push(var.clone());
+        }
+        if self.no_markdownlint {
+            parts.push("--no-markdownlint".to_string());
+        }
+        if self.no_openapi {
+            parts.push("--no-openapi".to_string());
         }
 
         parts.join(" ")
@@ -116,6 +130,8 @@ mod tests {
             force: false,
             server: Vec::new(),
             token_env_var: None,
+            no_markdownlint: false,
+            no_openapi: false,
         }
     }
 
@@ -136,9 +152,11 @@ mod tests {
         cfg.force = true;
         cfg.server = vec!["https://a.example.com".to_string()];
         cfg.token_env_var = Some("TOKEN_API".to_string());
+        cfg.no_markdownlint = true;
+        cfg.no_openapi = true;
         assert_eq!(
             cfg.to_command_string("openapi2skill"),
-            "openapi2skill spec.json --output-dir my_skill --verbose --force --server https://a.example.com --token-env-var TOKEN_API"
+            "openapi2skill spec.json --output-dir my_skill --verbose --force --server https://a.example.com --token-env-var TOKEN_API --no-markdownlint --no-openapi"
         );
     }
 }

@@ -47,6 +47,8 @@ Options:
   -f, --force                    Remove existing output directory
       --server <URL>             Override the server URL(s) from the spec. Can be specified multiple times (e.g. `--server api.example.com --server https://staging.example.com`). If the URL has no scheme, `https://` is prepended automatically. The override must include any base path the endpoints are relative to (e.g. `--server http://host:9090/api/v1`)
       --token-env-var <NAME>     Name of the environment variable holding the API key, token or basic auth credentials (e.g. `--token-env-var TOKEN_API_MICROSOFT`). Rendered in the authentication files of every static credential scheme
+      --no-markdownlint          Do not copy the `.markdownlint.jsonc` config into the generated skill
+      --no-openapi               Do not copy the raw OpenAPI manifest into the generated skill
   -h, --help                     Print help
   -V, --version                  Print version
 ```
@@ -125,7 +127,8 @@ site do
 not end up in the skill.
 
 A copy of that `.markdownlint.jsonc` is written at the root of every generated
-skill, so checking it needs no extra configuration:
+skill (unless `--no-markdownlint` is passed), so checking it needs no extra
+configuration:
 
 ```bash
 markdownlint ./my_api_skill

@@ -30,6 +30,8 @@ async fn main() -> Result<(), anyhow::Error> {
         manifest_extension: loaded.manifest_extension,
         command,
         token_env_var: config.token_env_var.clone(),
+        write_markdownlint: !config.no_markdownlint,
+        write_manifest: !config.no_openapi,
     };
     openapi2skill(
         &loaded.spec,

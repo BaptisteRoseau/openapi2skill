@@ -58,7 +58,7 @@ pub(super) struct Writer {
     pub(super) name: String,
     pub(super) servers_override: Vec<String>,
     pub(super) source_url: Option<String>,
-    pub(super) manifest_filename: String,
+    pub(super) manifest_filename: Option<String>,
     pub(super) command: String,
 }
 
@@ -83,10 +83,9 @@ impl Writer {
         ));
         out.push_str(&render_decription_and_navigation(description, spec));
         out.push_str(&render_index(spec));
-        out.push_str(&render_manifest_section(
-            &self.manifest_filename,
-            source_url,
-        ));
+        if let Some(filename) = &self.manifest_filename {
+            out.push_str(&render_manifest_section(filename, source_url));
+        }
         out
     }
 }
